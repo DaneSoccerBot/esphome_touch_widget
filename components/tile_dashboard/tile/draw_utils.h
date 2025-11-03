@@ -12,7 +12,7 @@ namespace esphome
   {
 
     // Utility function für Farbschattierung
-    static inline esphome::Color shade(esphome::Color c, int8_t delta)
+    inline esphome::Color shade(esphome::Color c, int8_t delta)
     {
       auto clamp = [](int v)
       { return v < 0 ? 0 : (v > 255 ? 255 : v); };

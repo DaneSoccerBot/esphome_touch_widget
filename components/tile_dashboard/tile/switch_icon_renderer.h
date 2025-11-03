@@ -1,14 +1,23 @@
+#ifndef SWITCH_ICON_RENDERER_H
+#define SWITCH_ICON_RENDERER_H
+
 #pragma once
 
-#include "colors.h"
 #include "esphome/components/display/display.h"
 #include "esphome/core/color.h"
-#include "tile/draw_utils.h" // DrawUtils::draw_rounded_rect + shade()
+#include "draw_utils.h" // DrawUtils::draw_rounded_rect
+#include "colors.h"
 
 namespace esphome
 {
   namespace tile_dashboard
   {
+    // Local shade function to avoid linker issues
+    static inline esphome::Color shade_local(esphome::Color c, int8_t delta)
+    {
+      auto clamp = [](int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); };
+      return esphome::Color(clamp(c.r + delta), clamp(c.g + delta), clamp(c.b + delta));
+    }
 
     class SwitchIconRenderer
     {
@@ -23,8 +32,8 @@ namespace esphome
 
         const auto col_face = Colors::LIGHT_GREY;
         const auto col_frame = Colors::TILE_BORDER;
-        const auto col_high = shade(col_frame, 30);
-        const auto col_low = shade(col_frame, -40);
+        const auto col_high = shade_local(col_frame, 30);
+        const auto col_low = shade_local(col_frame, -40);
 
         /* ───── Rahmen & Face ───── */
         DrawUtils::draw_rounded_rect(it, x, y, w, h, radius, col_frame);
@@ -75,3 +84,5 @@ namespace esphome
 
   } // namespace tile_dashboard
 } // namespace esphome
+
+#endif // SWITCH_ICON_RENDERER_H
