@@ -1,0 +1,32 @@
+# ESPHome / PlatformIO Build-Artefakte
+**/.esphome/
+.pio/
+*.pioenvs/
+build/
+*.bin
+*.elf
+*.uf2
+
+# Entwicklungsumgebungen
+.vscode/
+venv/
+.venv/
+
+# Temporäre & OS-Dateien
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+*.log
+*_crash.*
+
+# Projekt-Ordner, die du bewusst ausschließen willst
+removed/
+
+# Vertrauliche Infos
+secrets.yaml
+debug.yaml
+debug2.yaml
+debug3.yaml
+debug4.yaml
+debug5.yaml

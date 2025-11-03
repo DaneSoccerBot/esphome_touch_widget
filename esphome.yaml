@@ -1,0 +1,20 @@
+esphome:
+  name: displaysimulator
+
+host:  # <-- das ersetzt `platform: host`
+
+logger:
+
+display:
+  - platform: sdl
+    id: sim_display
+    update_interval: 1s
+    dimensions: 480x480
+    lambda: |-
+      it.fill(esphome::Color::BLACK);
+      it.print(240, 240, id(my_font), esphome::display::TextAlign::CENTER, "Hello SDL!");
+
+font:
+  - file: "gfonts://Roboto"
+    id: my_font
+    size: 24
