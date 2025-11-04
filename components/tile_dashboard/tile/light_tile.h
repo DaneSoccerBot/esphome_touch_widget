@@ -7,7 +7,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/api/api_server.h"
 #include "esphome/components/api/homeassistant_service.h"
-#include "tile/switch_icon_renderer.h"
+#include "switch_icon_renderer.h"
 
 using esphome::font::Font;
 
