@@ -40,11 +40,12 @@ class TileDashboardUnitTests(unittest.TestCase):
         self.assertEqual(component_base_id("dashboard_ui"), "dashboard_ui")
 
     def test_tile_position_returns_grid_tuple(self):
-        self.assertEqual(tile_position({"col": 3, "row": 2}), (3, 2))
+        self.assertEqual(tile_position({"col": 3, "row": 2}), (0, 3, 2))
+        self.assertEqual(tile_position({"col": 3, "row": 2, "page": 1}), (1, 3, 2))
 
     def test_validate_tile_bounds_accepts_in_grid_tile(self):
         tile = {"type": "switch", "col": 2, "row": 3}
-        self.assertEqual(validate_tile_bounds(tile, 2, 3), (2, 3))
+        self.assertEqual(validate_tile_bounds(tile, 2, 3), (0, 2, 3))
 
     def test_validate_tile_bounds_rejects_out_of_grid_column(self):
         with self.assertRaisesRegex(ValueError, "outside the configured grid 2x2"):

@@ -56,11 +56,15 @@ public:
       draw_close_button_(it);
       return;
     }
-    for(auto &t:tiles_) t->draw(it);
+    for(auto &t:tiles_){
+      if (t->page() == active_page_) t->draw(it);
+    }
+    if (num_pages() > 1) draw_page_indicator_(it);
   }
 
-  void clear(){ tiles_.clear(); focused_tile_ = nullptr; }
+  void clear(){ tiles_.clear(); focused_tile_ = nullptr; active_page_ = 0; }
 
+  // --- Fullscreen ---
   bool is_fullscreen() const { return focused_tile_ != nullptr; }
 
   void enter_fullscreen(Tile *t) {
@@ -72,10 +76,44 @@ public:
     if (focused_tile_ == nullptr) return;
     focused_tile_->clear_override_geometry();
     focused_tile_ = nullptr;
-    // invalidate all tiles so the grid redraws fully
-    for (auto &t : tiles_) t->invalidate_cache();
+    invalidate_all_();
   }
 
+  // --- Paging ---
+  uint8_t active_page() const { return active_page_; }
+  uint8_t num_pages() const {
+    uint8_t max_page = 0;
+    for (auto &t : tiles_) max_page = std::max(max_page, t->page());
+    return max_page + 1;
+  }
+
+  bool set_page(uint8_t page) {
+    if (page >= num_pages() || page == active_page_) return false;
+    active_page_ = page;
+    page_changed_ = true;
+    invalidate_all_();
+    return true;
+  }
+
+  bool next_page() {
+    const uint8_t np = num_pages();
+    if (np <= 1) return false;
+    return set_page((active_page_ + 1) % np);
+  }
+
+  bool prev_page() {
+    const uint8_t np = num_pages();
+    if (np <= 1) return false;
+    return set_page(active_page_ == 0 ? np - 1 : active_page_ - 1);
+  }
+
+  bool consume_page_changed() {
+    bool v = page_changed_;
+    page_changed_ = false;
+    return v;
+  }
+
+  // --- Touch dispatch ---
   void dispatch_touch(uint8_t col,uint8_t row,uint16_t local_x,uint16_t local_y){
     if (focused_tile_ != nullptr) {
       if (close_button_hit_(local_x, local_y)) { exit_fullscreen(); return; }
@@ -83,7 +121,7 @@ public:
       return;
     }
     for(auto &t:tiles_){
-      if(t->col()==col && t->row()==row){
+      if(t->page() == active_page_ && t->col()==col && t->row()==row){
         if (t->fullscreen_enabled()) { enter_fullscreen(t.get()); return; }
         t->dispatch_touch(local_x, local_y);
         break;
@@ -96,7 +134,12 @@ public:
       focused_tile_->dispatch_touch_update(local_x, local_y);
       return;
     }
-    for(auto &t:tiles_){ if(t->col()==col && t->row()==row){ t->dispatch_touch_update(local_x, local_y); break; }}
+    for(auto &t:tiles_){
+      if(t->page() == active_page_ && t->col()==col && t->row()==row){
+        t->dispatch_touch_update(local_x, local_y);
+        break;
+      }
+    }
   }
 
   void dispatch_touch_release(uint8_t col,uint8_t row,uint16_t local_x,uint16_t local_y){
@@ -104,12 +147,24 @@ public:
       focused_tile_->dispatch_touch_release(local_x, local_y);
       return;
     }
-    for(auto &t:tiles_){ if(t->col()==col && t->row()==row){ t->dispatch_touch_release(local_x, local_y); break; }}
+    for(auto &t:tiles_){
+      if(t->page() == active_page_ && t->col()==col && t->row()==row){
+        t->dispatch_touch_release(local_x, local_y);
+        break;
+      }
+    }
   }
   
 private:
   static constexpr int CLOSE_BTN_SIZE = 40;
   static constexpr int CLOSE_BTN_MARGIN = 8;
+  static constexpr int DOT_RADIUS = 4;
+  static constexpr int DOT_SPACING = 14;
+  static constexpr int DOT_BOTTOM_MARGIN = 10;
+
+  void invalidate_all_() {
+    for (auto &t : tiles_) t->invalidate_cache();
+  }
 
   bool close_button_hit_(uint16_t x, uint16_t y) const {
     const int bx = ctx_.x0 + ctx_.scr_w - CLOSE_BTN_SIZE - CLOSE_BTN_MARGIN;
@@ -125,15 +180,28 @@ private:
     const int cy = by + CLOSE_BTN_SIZE / 2;
     const int r = CLOSE_BTN_SIZE / 2;
     it.filled_circle(cx, cy, r, Colors::TILE_BACKGROUND);
-    // draw X
     const int d = r * 5 / 10;
     it.line(cx - d, cy - d, cx + d, cy + d, Colors::LIGHT_TEXT);
     it.line(cx + d, cy - d, cx - d, cy + d, Colors::LIGHT_TEXT);
   }
 
+  void draw_page_indicator_(Display &it) {
+    const uint8_t np = num_pages();
+    const int total_w = np * DOT_RADIUS * 2 + (np - 1) * (DOT_SPACING - DOT_RADIUS * 2);
+    const int start_x = ctx_.x0 + (ctx_.scr_w - total_w) / 2;
+    const int cy = ctx_.y0 + ctx_.scr_h - DOT_BOTTOM_MARGIN;
+    for (uint8_t i = 0; i < np; i++) {
+      const int cx = start_x + i * DOT_SPACING + DOT_RADIUS;
+      const auto color = (i == active_page_) ? Colors::TEXT : Colors::TILE_BORDER;
+      it.filled_circle(cx, cy, DOT_RADIUS, color);
+    }
+  }
+
   DisplayContext &ctx_;
   std::vector<std::unique_ptr<Tile>> tiles_;
   Tile *focused_tile_{nullptr};
+  uint8_t active_page_{0};
+  bool page_changed_{false};
 };
 
 // Singleton ------------------------------------------------------------------

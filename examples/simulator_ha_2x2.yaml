@@ -102,6 +102,7 @@ tile_dashboard:
   touch_rotation: ${touch_rotation}
   font_file: ${dashboard_font_file}
   tiles:
+    # --- Page 0: Climate controls ---
     - type: climate
       col: 1
       row: 1
@@ -109,6 +110,7 @@ tile_dashboard:
       payload: climate_zone_b_payload
       entity_id: ${climate_zone_b_entity}
       fullscreen: true
+      page: 0
 
     - type: climate
       col: 2
@@ -117,6 +119,7 @@ tile_dashboard:
       payload: climate_zone_a_payload
       entity_id: ${climate_zone_a_entity}
       fullscreen: true
+      page: 0
 
     - type: switch
       col: 1
@@ -124,6 +127,7 @@ tile_dashboard:
       label: ${switch_label}
       switch: dashboard_light_switch
       entity_id: ${light_switch_entity}
+      page: 0
 
     - type: double_value
       col: 2
@@ -136,3 +140,42 @@ tile_dashboard:
       bottom_unit: "€"
       top_format: "%.0f"
       bottom_format: "%.2f"
+      page: 0
+
+    # --- Page 1: Monitoring ---
+    - type: gauge
+      col: 1
+      row: 1
+      label: BATTERY
+      sensor: battery_percent
+      min_value: 0
+      max_value: 100
+      red_threshold: 20
+      yellow_threshold: 50
+      unit: "%"
+      format: "%.0f"
+      page: 1
+
+    - type: text_value
+      col: 2
+      row: 1
+      label: PRICE
+      sensor: energy_price
+      unit: "€"
+      format: "%.2f"
+      page: 1
+
+    - type: switch
+      col: 1
+      row: 2
+      label: ${switch_label}
+      switch: dashboard_light_switch
+      entity_id: ${light_switch_entity}
+      page: 1
+
+    - type: battery
+      col: 2
+      row: 2
+      label: BATTERY
+      sensor: battery_percent
+      page: 1

@@ -16,14 +16,15 @@ def component_base_id(component_id):
 
 
 def tile_position(tile):
-    return tile["col"], tile["row"]
+    return tile.get("page", 0), tile["col"], tile["row"]
 
 
 def validate_tile_bounds(tile, cols, rows):
     pos = tile_position(tile)
     if tile["col"] > cols or tile["row"] > rows:
         raise ValueError(
-            f"Tile {tile['type']} at {pos} is outside the configured grid {cols}x{rows}"
+            f"Tile {tile['type']} at col={tile['col']}, row={tile['row']} "
+            f"is outside the configured grid {cols}x{rows}"
         )
     return pos
 
@@ -36,7 +37,10 @@ def validate_tiles(config):
     for tile in config["tiles"]:
         pos = validate_tile_bounds(tile, cols, rows)
         if pos in positions:
-            raise ValueError(f"Duplicate tile position detected at {pos}")
+            raise ValueError(
+                f"Duplicate tile position detected at "
+                f"page={pos[0]}, col={pos[1]}, row={pos[2]}"
+            )
         positions.add(pos)
 
     return config

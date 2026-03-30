@@ -39,6 +39,8 @@ public:
   uint8_t col() const { return col_; }
   uint8_t row() const { return row_; }
   uint8_t numTilesY() const { return numTilesY_; }
+  uint8_t page() const { return page_; }
+  void set_page(uint8_t p) { page_ = p; }
   bool fullscreen_enabled() const { return fullscreen_enabled_; }
   void set_fullscreen_enabled(bool v) { fullscreen_enabled_ = v; }
   bool is_fullscreen() const { return override_geo_.has_value(); }
@@ -228,6 +230,7 @@ protected:
 protected:
   DisplayContext &ctx_;
   uint8_t col_, row_, numTilesY_;
+  uint8_t page_{0};
   std::string label_;
   std::string label2_;
   Display *disp_{nullptr};
