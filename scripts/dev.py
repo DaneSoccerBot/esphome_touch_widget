@@ -16,6 +16,7 @@ from tooling import (
     detect_windows_msys2_root,
     require_venv,
     run,
+    simulator_substitution_args,
     venv_esphome,
     venv_python,
 )
@@ -23,6 +24,21 @@ from tooling import (
 
 REQUIREMENTS_FILE = ROOT / "requirements-dev.txt"
 PINNED_ESPHOME_VERSION = "2025.3.3"
+
+
+SIMULATOR_CONFIGS = (
+    "examples/simulator_ha_2x2.yaml",
+    "examples/simulator_showcase_3x3.yaml",
+    "examples/simulator_all_tiles.yaml",
+)
+
+
+def esphome_command(subcommand: str, config_path: str) -> list[str]:
+    args = [venv_esphome()]
+    if config_path in SIMULATOR_CONFIGS:
+        args.extend(simulator_substitution_args())
+    args.extend([subcommand, config_path])
+    return args
 
 
 def create_venv() -> None:
@@ -90,23 +106,17 @@ def cmd_unit(_: argparse.Namespace) -> None:
 def cmd_config(_: argparse.Namespace) -> None:
     require_venv()
     for config_path in (
-        "examples/simulator_ha_2x2.yaml",
-        "examples/simulator_showcase_3x3.yaml",
-        "examples/simulator_all_tiles.yaml",
+        *SIMULATOR_CONFIGS,
         "examples/display48norelay.refactored.yaml",
         "examples/display48norelay.package_import.yaml",
     ):
-        run([venv_esphome(), "config", config_path])
+        run(esphome_command("config", config_path))
 
 
 def cmd_compile_sim(_: argparse.Namespace) -> None:
     require_venv()
-    for config_path in (
-        "examples/simulator_ha_2x2.yaml",
-        "examples/simulator_showcase_3x3.yaml",
-        "examples/simulator_all_tiles.yaml",
-    ):
-        run([venv_esphome(), "compile", config_path])
+    for config_path in SIMULATOR_CONFIGS:
+        run(esphome_command("compile", config_path))
 
 
 def cmd_compile_esp32(_: argparse.Namespace) -> None:
@@ -120,17 +130,17 @@ def cmd_compile_esp32(_: argparse.Namespace) -> None:
 
 def cmd_run_sim_2x2(_: argparse.Namespace) -> None:
     require_venv()
-    run([venv_esphome(), "run", "examples/simulator_ha_2x2.yaml"])
+    run(esphome_command("run", "examples/simulator_ha_2x2.yaml"))
 
 
 def cmd_run_sim_3x3(_: argparse.Namespace) -> None:
     require_venv()
-    run([venv_esphome(), "run", "examples/simulator_showcase_3x3.yaml"])
+    run(esphome_command("run", "examples/simulator_showcase_3x3.yaml"))
 
 
 def cmd_run_sim_all(_: argparse.Namespace) -> None:
     require_venv()
-    run([venv_esphome(), "run", "examples/simulator_all_tiles.yaml"])
+    run(esphome_command("run", "examples/simulator_all_tiles.yaml"))
 
 
 def cmd_test(_: argparse.Namespace) -> None:

@@ -1,6 +1,7 @@
 display:
   - platform: sdl
     id: dashboard_display
+    sdl_options: ${simulator_sdl_options}
     update_interval: 250ms
     auto_clear_enabled: false
     dimensions:

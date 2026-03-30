@@ -63,6 +63,41 @@ def ensure_windows_sdl2_config_wrapper(
     return wrapper_path
 
 
+def get_windows_sdl2_options(root: Path | None = None) -> str | None:
+    if os.name != "nt":
+        return None
+
+    if root is None:
+        root = detect_windows_msys2_root()
+    if root is None:
+        return None
+
+    bash_exe = root / "usr/bin/bash.exe"
+    sdl2_config = root / "ucrt64/bin/sdl2-config"
+    if not bash_exe.exists() or not sdl2_config.exists():
+        return None
+
+    env = build_windows_msys2_env(build_platformio_env(os.environ), root, TOOLING_BIN_DIR)
+    result = subprocess.run(
+        [str(bash_exe), "-lc", "/ucrt64/bin/sdl2-config --cflags --libs"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def simulator_substitution_args() -> list[str]:
+    sdl_options = get_windows_sdl2_options()
+    if not sdl_options:
+        return []
+    return ["-s", "simulator_sdl_options", sdl_options]
+
+
 def detect_windows_msys2_root(candidates: list[Path] | None = None) -> Path | None:
     if candidates is None:
         candidates = []

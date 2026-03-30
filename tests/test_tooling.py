@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -14,6 +15,8 @@ from tooling import (  # noqa: E402
     build_windows_msys2_env,
     detect_windows_msys2_root,
     ensure_windows_sdl2_config_wrapper,
+    get_windows_sdl2_options,
+    simulator_substitution_args,
 )
 
 
@@ -89,6 +92,21 @@ class ToolingTests(unittest.TestCase):
             root = Path(temp_dir) / "msys64"
             wrapper = ensure_windows_sdl2_config_wrapper(root, Path(temp_dir) / "bin")
             self.assertIsNone(wrapper)
+
+    def test_get_windows_sdl2_options_returns_stdout_when_available(self):
+        root = Path("C:/msys64")
+        completed = mock.Mock(returncode=0, stdout="-IC:/msys64/ucrt64/include/SDL2 -LC:/msys64/ucrt64/lib -lSDL2\n")
+        with mock.patch("tooling.os.name", "nt"):
+            with mock.patch("tooling.subprocess.run", return_value=completed) as run_mock:
+                with mock.patch.object(Path, "exists", return_value=True):
+                    result = get_windows_sdl2_options(root)
+        self.assertEqual(result, "-IC:/msys64/ucrt64/include/SDL2 -LC:/msys64/ucrt64/lib -lSDL2")
+        run_mock.assert_called_once()
+
+    def test_simulator_substitution_args_wraps_windows_sdl_options(self):
+        with mock.patch("tooling.get_windows_sdl2_options", return_value="-Ifoo -Lbar -lSDL2"):
+            args = simulator_substitution_args()
+        self.assertEqual(args, ["-s", "simulator_sdl_options", "-Ifoo -Lbar -lSDL2"])
 
 
 if __name__ == "__main__":

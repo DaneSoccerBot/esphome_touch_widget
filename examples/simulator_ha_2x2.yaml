@@ -9,6 +9,7 @@ substitutions:
   touch_rotation: "0"
   dashboard_width: "480"
   dashboard_height: "480"
+  simulator_sdl_options: ""
   climate_zone_a_entity: climate.simulator_zone_a
   climate_zone_b_entity: climate.simulator_zone_b
   climate_zone_a_label: ZONE A

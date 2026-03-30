@@ -9,6 +9,7 @@ substitutions:
   touch_rotation: "0"
   dashboard_width: "800"
   dashboard_height: "480"
+  simulator_sdl_options: ""
 
 packages:
   device: !include ../packages/device/simulator_device_base.yaml
