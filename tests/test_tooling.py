@@ -9,8 +9,12 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from tooling import build_windows_msys2_env, detect_windows_msys2_root  # noqa: E402
-from tooling import build_platformio_env  # noqa: E402
+from tooling import (  # noqa: E402
+    build_platformio_env,
+    build_windows_msys2_env,
+    detect_windows_msys2_root,
+    ensure_windows_sdl2_config_wrapper,
+)
 
 
 class ToolingTests(unittest.TestCase):
@@ -38,8 +42,11 @@ class ToolingTests(unittest.TestCase):
 
     def test_build_windows_msys2_env_injects_required_paths(self):
         root = Path("C:/msys64")
-        env = build_windows_msys2_env({"PATH": "C:/Windows/System32"}, root)
+        env = build_windows_msys2_env(
+            {"PATH": "C:/Windows/System32"}, root, Path("C:/repo/.cache/tooling/bin")
+        )
 
+        self.assertIn("C:/repo/.cache/tooling/bin", env["PATH"])
         self.assertIn(str(root / "ucrt64/bin"), env["PATH"])
         self.assertIn(str(root / "usr/bin"), env["PATH"])
         self.assertEqual(env["MSYSTEM"], "UCRT64")
@@ -55,6 +62,31 @@ class ToolingTests(unittest.TestCase):
         base_env = {"PATH": os.environ.get("PATH", "")}
         env = build_windows_msys2_env(base_env, None)
         self.assertEqual(env, base_env)
+
+    def test_ensure_windows_sdl2_config_wrapper_creates_cmd_wrapper(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "msys64"
+            bash_exe = root / "usr/bin/bash.exe"
+            sdl2_config = root / "ucrt64/bin/sdl2-config"
+            bash_exe.parent.mkdir(parents=True)
+            sdl2_config.parent.mkdir(parents=True)
+            bash_exe.write_text("")
+            sdl2_config.write_text("")
+
+            tooling_bin = Path(temp_dir) / "tooling/bin"
+            wrapper = ensure_windows_sdl2_config_wrapper(root, tooling_bin)
+
+            self.assertEqual(wrapper, tooling_bin / "sdl2-config.cmd")
+            self.assertTrue(wrapper.exists())
+            wrapper_text = wrapper.read_text()
+            self.assertIn(str(bash_exe), wrapper_text)
+            self.assertIn("/ucrt64/bin/sdl2-config", wrapper_text)
+
+    def test_ensure_windows_sdl2_config_wrapper_returns_none_without_inputs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "msys64"
+            wrapper = ensure_windows_sdl2_config_wrapper(root, Path(temp_dir) / "bin")
+            self.assertIsNone(wrapper)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 PLATFORMIO_CORE_DIR = ROOT / ".cache" / "platformio"
+TOOLING_BIN_DIR = ROOT / ".cache" / "tooling" / "bin"
 
 
 def bin_dir() -> Path:
@@ -37,6 +38,29 @@ def build_platformio_env(
     return env
 
 
+def ensure_windows_sdl2_config_wrapper(
+    root: Path | None, tooling_bin_dir: Path = TOOLING_BIN_DIR
+) -> Path | None:
+    if root is None:
+        return None
+
+    bash_exe = root / "usr/bin/bash.exe"
+    sdl2_config = root / "ucrt64/bin/sdl2-config"
+    if not bash_exe.exists() or not sdl2_config.exists():
+        return None
+
+    tooling_bin_dir.mkdir(parents=True, exist_ok=True)
+    wrapper_path = tooling_bin_dir / "sdl2-config.cmd"
+    wrapper = (
+        "@echo off\n"
+        "setlocal\n"
+        f'"{bash_exe}" -lc "exec /ucrt64/bin/sdl2-config \\"$@\\"" -- %*\n'
+    )
+    if not wrapper_path.exists() or wrapper_path.read_text() != wrapper:
+        wrapper_path.write_text(wrapper)
+    return wrapper_path
+
+
 def detect_windows_msys2_root(candidates: list[Path] | None = None) -> Path | None:
     if candidates is None:
         candidates = []
@@ -58,7 +82,9 @@ def detect_windows_msys2_root(candidates: list[Path] | None = None) -> Path | No
 
 
 def build_windows_msys2_env(
-    base_env: dict[str, str] | None = None, root: Path | None = None
+    base_env: dict[str, str] | None = None,
+    root: Path | None = None,
+    tooling_bin_dir: Path | None = None,
 ) -> dict[str, str]:
     env = dict(base_env or {})
     if root is None:
@@ -66,7 +92,10 @@ def build_windows_msys2_env(
 
     ucrt_bin = root / "ucrt64/bin"
     usr_bin = root / "usr/bin"
-    path_parts = [str(ucrt_bin), str(usr_bin)]
+    path_parts = []
+    if tooling_bin_dir is not None:
+        path_parts.append(str(tooling_bin_dir))
+    path_parts.extend([str(ucrt_bin), str(usr_bin)])
     existing_path = env.get("PATH")
     if existing_path:
         path_parts.append(existing_path)
@@ -95,9 +124,9 @@ def tooling_env(env: dict[str, str] | None = None) -> dict[str, str]:
     platformio_core_dir = Path(merged["PLATFORMIO_CORE_DIR"])
     platformio_core_dir.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
-        merged = build_windows_msys2_env(
-            merged, detect_windows_msys2_root()
-        )
+        msys2_root = detect_windows_msys2_root()
+        ensure_windows_sdl2_config_wrapper(msys2_root)
+        merged = build_windows_msys2_env(merged, msys2_root, TOOLING_BIN_DIR)
     return merged
 
 
@@ -146,11 +175,11 @@ def host_simulator_hint() -> str:
 
 def check_host_simulator_support() -> tuple[bool, str]:
     env = tooling_env()
-    pkg_config = shutil.which("pkg-config", path=env.get("PATH"))
-    if pkg_config is None:
+    sdl2_config = shutil.which("sdl2-config", path=env.get("PATH"))
+    if sdl2_config is None:
         return False, host_simulator_hint()
     result = subprocess.run(
-        [pkg_config, "--exists", "sdl2"],
+        [sdl2_config, "--cflags", "--libs"],
         cwd=ROOT,
         env=env,
         stdout=subprocess.DEVNULL,
