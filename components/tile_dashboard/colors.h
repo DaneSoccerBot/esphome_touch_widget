@@ -14,7 +14,7 @@ namespace Colors {
   static esphome::Color LIGHT_GREY(40, 40, 40);   // #282828
   static esphome::Color SCREEN_BACKGROUND(0, 0, 0); // #000000
   static esphome::Color LIGHT_TEXT(160, 160, 160);  // #c8c8c8  
-  static esphome::Color TEXT(220, 220, 220);     // #e6e6e6
+  static esphome::Color NORMAL_TEXT(220, 220, 220);     // #e6e6e6
   static esphome::Color TILE_BORDER(60, 60, 60);  // #3c3c3c
 }
 

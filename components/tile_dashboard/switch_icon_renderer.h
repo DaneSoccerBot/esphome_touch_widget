@@ -71,14 +71,14 @@ namespace esphome
         const int16_t cy = on ? (iy + half * 0.6) : (iy + half * 1.45);
         const uint16_t outer = w * 0.26;
         const uint16_t inner = w * 0.18;
-        DrawUtils::draw_ring(it, cx, cy, outer, inner, Colors::TEXT, state_col);
+        DrawUtils::draw_ring(it, cx, cy, outer, inner, Colors::NORMAL_TEXT, state_col);
 
         const int16_t barWidth = w * 0.08;
         const int16_t barHeight = w * 0.25;
         const int16_t barOutline = w * 0.04;
 
         it.filled_rectangle(cx - barWidth / 2 - barOutline, cy - barHeight * 0.7 - outer / 2 - barOutline, barWidth + barOutline * 2, barHeight + barOutline * 2, state_col);
-        it.filled_rectangle(cx - barWidth / 2, cy - barHeight * 0.7 - outer / 2, barWidth, barHeight, Colors::TEXT);
+        it.filled_rectangle(cx - barWidth / 2, cy - barHeight * 0.7 - outer / 2, barWidth, barHeight, Colors::NORMAL_TEXT);
       }
     };
 

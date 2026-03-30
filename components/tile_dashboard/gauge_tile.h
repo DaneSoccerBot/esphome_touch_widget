@@ -121,7 +121,7 @@ protected:
       std::snprintf(buf_val, sizeof(buf_val), fmt_.c_str(), value);
       std::snprintf(buf_all, sizeof(buf_all), "%s%s", buf_val, unit_.c_str());
       it.print(cx, cy + h * 0.18f,
-               gauge_font_, Colors::TEXT,
+               gauge_font_, Colors::NORMAL_TEXT,
                esphome::display::TextAlign::CENTER,
                buf_all);
       it.end_clipping();

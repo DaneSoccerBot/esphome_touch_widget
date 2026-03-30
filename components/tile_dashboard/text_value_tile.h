@@ -58,7 +58,7 @@ protected:
 
     it.print(abs_x() + tile_w() / 2,
              abs_y() + tile_h() * 0.5f,
-             ctx_.font_value_compact, Colors::TEXT,
+             ctx_.font_value_compact, Colors::NORMAL_TEXT,
              esphome::display::TextAlign::CENTER, buf);
   }
 

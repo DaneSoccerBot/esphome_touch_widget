@@ -4,6 +4,11 @@ esphome:
   project:
     name: ${project_name}
     version: ${project_version}
+  platformio_options:
+    build_flags:
+      - "-include cstdint"
+      - "-D_USE_MATH_DEFINES"
+      - "-fpermissive"
 
 host:
 

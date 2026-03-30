@@ -88,7 +88,21 @@ def get_windows_sdl2_options(root: Path | None = None) -> str | None:
     )
     if result.returncode != 0:
         return None
-    return result.stdout.strip() or None
+    sdl_flags = result.stdout.strip()
+    if not sdl_flags:
+        return None
+
+    # ESPHome's host main() is C++ with no args.  The -Dmain=SDL_main
+    # rename produces a C++-mangled symbol that SDL2main cannot resolve.
+    # Drop the SDL_main wrapper flags; the native host entry point works
+    # without WinMain.
+    drop = {"-Dmain=SDL_main", "-lSDL2main", "-lmingw32", "-mwindows"}
+    sdl_flags = " ".join(t for t in sdl_flags.split() if t not in drop)
+
+    # POSIX-to-Winsock2 shim headers for ESPHome host platform on Windows
+    compat_dir = (ROOT / "compat" / "win32_posix").as_posix()
+    compat_flags = f"-I{compat_dir} -lws2_32"
+    return f"{compat_flags} {sdl_flags}"
 
 
 def simulator_substitution_args() -> list[str]:

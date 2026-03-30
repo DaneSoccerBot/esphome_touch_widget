@@ -255,7 +255,7 @@ protected:
       std::snprintf(buf, sizeof(buf), "%s", mode_up.c_str());
     }
 
-    it.print(cx, cy - h * 0.02, font_big_, Colors::TEXT,
+    it.print(cx, cy - h * 0.02, font_big_, Colors::NORMAL_TEXT,
              esphome::display::TextAlign::CENTER, buf);
 
     draw_current_temp_label(it);

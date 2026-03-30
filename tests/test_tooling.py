@@ -101,7 +101,9 @@ class ToolingTests(unittest.TestCase):
             with mock.patch("tooling.subprocess.run", return_value=completed) as run_mock:
                 with mock.patch.object(Path, "exists", return_value=True):
                     result = get_windows_sdl2_options(root)
-        self.assertEqual(result, "-IC:/msys64/ucrt64/include/SDL2 -LC:/msys64/ucrt64/lib -lSDL2")
+        compat_dir = (ROOT / "compat" / "win32_posix").as_posix()
+        expected = f"-I{compat_dir} -lws2_32 -IC:/msys64/ucrt64/include/SDL2 -LC:/msys64/ucrt64/lib -lSDL2"
+        self.assertEqual(result, expected)
         run_mock.assert_called_once()
 
     def test_simulator_substitution_args_wraps_windows_sdl_options(self):

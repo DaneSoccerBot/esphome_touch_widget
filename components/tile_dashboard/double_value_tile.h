@@ -189,7 +189,7 @@ private:
 
             it.print(x0 + w / 2,
                      y0 + ypos,
-                     ctx_.font_value_compact, Colors::TEXT,
+                     ctx_.font_value_compact, Colors::NORMAL_TEXT,
                      esphome::display::TextAlign::CENTER,
                      buf);
         }
