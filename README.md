@@ -74,25 +74,25 @@ Die Geräte-YAML enthält keine Display- oder Touch-Lambdas mehr. Die Komponente
 
 ## Wichtigste Dateien
 
-- [`components/tile_dashboard/__init__.py`](/Users/dane/Documents/Python/ESPHome/components/tile_dashboard/__init__.py)
+- [`components/tile_dashboard/__init__.py`](components/tile_dashboard/__init__.py)
   ESPHome-Schema und Codegen.
-- [`components/tile_dashboard/config.py`](/Users/dane/Documents/Python/ESPHome/components/tile_dashboard/config.py)
+- [`components/tile_dashboard/config.py`](components/tile_dashboard/config.py)
   Testbare Helper für Tile- und Font-Konfiguration.
-- [`components/tile_dashboard/tile_dashboard_component.h`](/Users/dane/Documents/Python/ESPHome/components/tile_dashboard/tile_dashboard_component.h)
+- [`components/tile_dashboard/tile_dashboard_component.h`](components/tile_dashboard/tile_dashboard_component.h)
   Runtime für Rendering, Touch-Routing und Tile-Erzeugung.
-- [`packages/device/display48_device_base.yaml`](/Users/dane/Documents/Python/ESPHome/packages/device/display48_device_base.yaml)
+- [`packages/device/display48_device_base.yaml`](packages/device/display48_device_base.yaml)
   Dünne Basis für das echte 480x480-ESP32-Display.
-- [`packages/device/simulator_device_base.yaml`](/Users/dane/Documents/Python/ESPHome/packages/device/simulator_device_base.yaml)
+- [`packages/device/simulator_device_base.yaml`](packages/device/simulator_device_base.yaml)
   Dünne Basis für den Host/SDL-Simulator.
-- [`packages/import/display48_device_base.yaml`](/Users/dane/Documents/Python/ESPHome/packages/import/display48_device_base.yaml)
+- [`packages/import/display48_device_base.yaml`](packages/import/display48_device_base.yaml)
   Remote-Package für echte Geräte.
-- [`examples/display48norelay.refactored.yaml`](/Users/dane/Documents/Python/ESPHome/examples/display48norelay.refactored.yaml)
+- [`examples/display48norelay.refactored.yaml`](examples/display48norelay.refactored.yaml)
   Dünne lokale ESP32-Geräte-YAML.
-- [`examples/display48norelay.package_import.yaml`](/Users/dane/Documents/Python/ESPHome/examples/display48norelay.package_import.yaml)
+- [`examples/display48norelay.package_import.yaml`](examples/display48norelay.package_import.yaml)
   Dünne lokale Geräte-YAML über das Import-Package.
-- [`examples/simulator_ha_2x2.yaml`](/Users/dane/Documents/Python/ESPHome/examples/simulator_ha_2x2.yaml)
+- [`examples/simulator_ha_2x2.yaml`](examples/simulator_ha_2x2.yaml)
   Dünne lokale Simulator-YAML.
-- [`examples/simulator_all_tiles.yaml`](/Users/dane/Documents/Python/ESPHome/examples/simulator_all_tiles.yaml)
+- [`examples/simulator_all_tiles.yaml`](examples/simulator_all_tiles.yaml)
   Simulator-Beispiel, das alle Tile-Typen abdeckt.
 
 ## Repo-Einbindung
@@ -197,4 +197,4 @@ Dieses Repo enthält bewusst nur den aktiv gepflegten Pfad:
 
 - Zusätzliche Hardware-Basen für andere Display-Boards ergänzen.
 - Mehr Beispiel-Geräte-YAMLs mit 3x2- und 4x4-Grids hinzufügen.
-- Die Beispielwerte in [`packages/import/display48_device_base.yaml`](/Users/dane/Documents/Python/ESPHome/packages/import/display48_device_base.yaml) auf das echte öffentliche Repo und Release-Tags setzen.
+- Die Beispielwerte in [`packages/import/display48_device_base.yaml`](packages/import/display48_device_base.yaml) auf das echte öffentliche Repo und Release-Tags setzen.
