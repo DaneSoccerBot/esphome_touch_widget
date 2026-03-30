@@ -198,3 +198,11 @@ Dieses Repo enthält bewusst nur den aktiv gepflegten Pfad:
 - Zusätzliche Hardware-Basen für andere Display-Boards ergänzen.
 - Mehr Beispiel-Geräte-YAMLs mit 3x2- und 4x4-Grids hinzufügen.
 - Die Beispielwerte in [`packages/import/display48_device_base.yaml`](packages/import/display48_device_base.yaml) auf das echte öffentliche Repo und Release-Tags setzen.
+
+## Lizenz
+
+Der Quellcode dieses Repos steht unter der MIT-Lizenz. Siehe [`LICENSE`](LICENSE).
+
+Das mitgelieferte Font-Asset unter [`assets/fonts/RobotoCondensed-Regular.ttf`](assets/fonts/RobotoCondensed-Regular.ttf)
+ist ein Drittanbieter-Asset und bleibt unter seiner eigenen Lizenz. Siehe
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
