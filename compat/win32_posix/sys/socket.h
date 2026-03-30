@@ -15,4 +15,18 @@
 
 typedef int socklen_t;
 
+/*
+ * Ensure WSAStartup() is called before any Winsock function.
+ * Uses a file-scoped C++ constructor so it runs before main().
+ */
+namespace _compat_wsa {
+struct Init {
+    Init() {
+        WSADATA d;
+        WSAStartup(MAKEWORD(2, 2), &d);
+    }
+};
+static Init _wsa_init;
+}  // namespace _compat_wsa
+
 #endif /* _COMPAT_SYS_SOCKET_H */
