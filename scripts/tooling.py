@@ -95,8 +95,10 @@ def get_windows_sdl2_options(root: Path | None = None) -> str | None:
     # ESPHome's host main() is C++ with no args.  The -Dmain=SDL_main
     # rename produces a C++-mangled symbol that SDL2main cannot resolve.
     # Drop the SDL_main wrapper flags; the native host entry point works
-    # without WinMain.
-    drop = {"-Dmain=SDL_main", "-lSDL2main", "-lmingw32"}
+    # without WinMain.  Also drop -mwindows so the binary stays a console
+    # application — PowerShell does not wait for GUI-subsystem processes,
+    # causing the simulator to exit immediately.
+    drop = {"-Dmain=SDL_main", "-lSDL2main", "-mwindows"}
     sdl_flags = " ".join(t for t in sdl_flags.split() if t not in drop)
 
     # POSIX-to-Winsock2 shim headers for ESPHome host platform on Windows
@@ -181,7 +183,29 @@ def tooling_env(env: dict[str, str] | None = None) -> dict[str, str]:
     return merged
 
 
-def run(cmd: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+_RUNTIME_DLLS = ("SDL2.dll", "libstdc++-6.dll", "libwinpthread-1.dll")
+
+
+def stage_windows_runtime_dlls(build_dir: Path) -> None:
+    """Copy MSYS2 runtime DLLs next to program.exe so the binary can find them."""
+    if os.name != "nt":
+        return
+    root = detect_windows_msys2_root()
+    if root is None:
+        return
+    ucrt_bin = root / "ucrt64" / "bin"
+    for name in _RUNTIME_DLLS:
+        src = ucrt_bin / name
+        dst = build_dir / name
+        if src.exists() and not dst.exists():
+            shutil.copy2(src, dst)
+
+
+def run(
+    cmd: list[str],
+    env: dict[str, str] | None = None,
+    ignore_exit_code: bool = False,
+) -> subprocess.CompletedProcess[str]:
     print("+", " ".join(str(part) for part in cmd))
     completed = subprocess.run(
         [str(part) for part in cmd],
@@ -189,7 +213,7 @@ def run(cmd: list[str], env: dict[str, str] | None = None) -> subprocess.Complet
         env=tooling_env(env),
         text=True,
     )
-    if completed.returncode != 0:
+    if completed.returncode != 0 and not ignore_exit_code:
         raise SystemExit(completed.returncode)
     return completed
 

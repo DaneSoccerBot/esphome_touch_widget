@@ -17,6 +17,7 @@ from tooling import (
     require_venv,
     run,
     simulator_substitution_args,
+    stage_windows_runtime_dlls,
     venv_esphome,
     venv_python,
 )
@@ -31,6 +32,13 @@ SIMULATOR_CONFIGS = (
     "examples/simulator_showcase_3x3.yaml",
     "examples/simulator_all_tiles.yaml",
 )
+
+# Map each simulator config to its PlatformIO build output directory.
+SIMULATOR_BUILD_DIRS = {
+    "examples/simulator_ha_2x2.yaml": ROOT / "examples/.esphome/build/dashboard-2x2-ha/.pioenvs/dashboard-2x2-ha",
+    "examples/simulator_showcase_3x3.yaml": ROOT / "examples/.esphome/build/dashboard-3x3-showcase/.pioenvs/dashboard-3x3-showcase",
+    "examples/simulator_all_tiles.yaml": ROOT / "examples/.esphome/build/dashboard-all-tiles/.pioenvs/dashboard-all-tiles",
+}
 
 
 def esphome_command(subcommand: str, config_path: str) -> list[str]:
@@ -128,19 +136,27 @@ def cmd_compile_esp32(_: argparse.Namespace) -> None:
         run([venv_esphome(), "compile", config_path])
 
 
-def cmd_run_sim_2x2(_: argparse.Namespace) -> None:
+def _run_simulator(config_path: str) -> None:
     require_venv()
-    run(esphome_command("run", "examples/simulator_ha_2x2.yaml"))
+    # Compile first so the build directory exists before we stage DLLs.
+    # ESPHome's 'run' would compile again, but the build is already cached.
+    run(esphome_command("compile", config_path))
+    build_dir = SIMULATOR_BUILD_DIRS.get(config_path)
+    if build_dir:
+        stage_windows_runtime_dlls(build_dir)
+    run(esphome_command("run", config_path), ignore_exit_code=True)
+
+
+def cmd_run_sim_2x2(_: argparse.Namespace) -> None:
+    _run_simulator("examples/simulator_ha_2x2.yaml")
 
 
 def cmd_run_sim_3x3(_: argparse.Namespace) -> None:
-    require_venv()
-    run(esphome_command("run", "examples/simulator_showcase_3x3.yaml"))
+    _run_simulator("examples/simulator_showcase_3x3.yaml")
 
 
 def cmd_run_sim_all(_: argparse.Namespace) -> None:
-    require_venv()
-    run(esphome_command("run", "examples/simulator_all_tiles.yaml"))
+    _run_simulator("examples/simulator_all_tiles.yaml")
 
 
 def cmd_test(_: argparse.Namespace) -> None:
