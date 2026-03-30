@@ -54,7 +54,9 @@ def ensure_windows_sdl2_config_wrapper(
     wrapper = (
         "@echo off\n"
         "setlocal\n"
-        f'"{bash_exe}" -lc "exec /ucrt64/bin/sdl2-config \\"$@\\"" -- %*\n'
+        "set \"MSYSTEM=UCRT64\"\n"
+        "set \"CHERE_INVOKING=1\"\n"
+        f'"{bash_exe}" -lc "/ucrt64/bin/sdl2-config %*"\n'
     )
     if not wrapper_path.exists() or wrapper_path.read_text() != wrapper:
         wrapper_path.write_text(wrapper)
@@ -175,17 +177,20 @@ def host_simulator_hint() -> str:
 
 def check_host_simulator_support() -> tuple[bool, str]:
     env = tooling_env()
-    sdl2_config = shutil.which("sdl2-config", path=env.get("PATH"))
-    if sdl2_config is None:
+    if shutil.which("sdl2-config", path=env.get("PATH")) is None:
         return False, host_simulator_hint()
-    result = subprocess.run(
-        [sdl2_config, "--cflags", "--libs"],
-        cwd=ROOT,
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["sdl2-config", "--cflags", "--libs"],
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False, host_simulator_hint()
     if result.returncode != 0:
         return False, host_simulator_hint()
     return True, "SDL2 development files detected."

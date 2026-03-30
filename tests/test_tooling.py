@@ -81,6 +81,8 @@ class ToolingTests(unittest.TestCase):
             wrapper_text = wrapper.read_text()
             self.assertIn(str(bash_exe), wrapper_text)
             self.assertIn("/ucrt64/bin/sdl2-config", wrapper_text)
+            self.assertIn("MSYSTEM=UCRT64", wrapper_text)
+            self.assertIn("CHERE_INVOKING=1", wrapper_text)
 
     def test_ensure_windows_sdl2_config_wrapper_returns_none_without_inputs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
