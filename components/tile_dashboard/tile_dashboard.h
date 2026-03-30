@@ -33,7 +33,7 @@
 #include <cmath>
 #include <utility>
 #include "display_context.h"
-#include "tile/tile.h"    // Tile base class + DisplayContext
+#include "tile.h"    // Tile base class + DisplayContext
 
 using esphome::display::Display;
 
@@ -51,6 +51,8 @@ public:
   }
 
   void draw(Display &it){ for(auto &t:tiles_) t->draw(it);}  
+
+  void clear(){ tiles_.clear(); }
 
   void dispatch_touch(uint8_t col,uint8_t row,uint16_t local_x,uint16_t local_y){
     for(auto &t:tiles_){ if(t->col()==col && t->row()==row){ t->dispatch_touch(local_x, local_y); break; }}

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cstdio>
 
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h"
 
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -40,19 +40,24 @@ public:
   } cache_;
 
   /* ---------- Konstruktor ---------- */
+  explicit ClimateTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+                       std::string label, const Cfg &cfg)
+      : Tile(ctx, col, row, 1, std::move(label)), cfg_(cfg)
+  {
+    if (cfg_.payload != nullptr)
+    {
+      if (cfg_.payload->has_state())
+        parse_payload_(cfg_.payload->state);
+      cfg_.payload->add_on_state_callback([this](const std::string &s)
+                                          {
+        parse_payload_(s);
+        request_redraw(); });
+    }
+  }
+
   explicit ClimateTile(uint8_t col, uint8_t row,
                        std::string label, const Cfg &cfg)
-      : Tile(get_display_ctx(), col, row, 1, std::move(label)), cfg_(cfg)
-  {
-    // Fonts
-    auto &ctx = get_display_ctx();
-    float hpx = float(ctx.scr_h) / ctx.rows;
-    font_big_ = ctx.get_font_for_size(hpx * 0.22f);
-    font_small_ = ctx.get_font_for_size(hpx * 0.12f);
-
-    cfg_.payload->add_on_state_callback([this](const std::string &s)
-                                        { parse_payload_(s); });
-  }
+      : ClimateTile(get_display_ctx(), col, row, std::move(label), cfg) {}
 
   void parse_climate_state_from_string(const std::string &s)
   {
@@ -193,6 +198,7 @@ protected:
   /* ---------- Zeichenroutine ---------- */
   void draw_content(Display &it) override
   {
+    ensure_fonts_();
     const float tgt = cache_.target;
 
     // Geometrie
@@ -285,6 +291,7 @@ private:
   }
   void draw_current_temp_label(Display &it)
   {
+    ensure_fonts_();
     char buf[16];
     const int w = tile_w(), h = tile_h();
     const int x = abs_x(), y = abs_y();
@@ -419,7 +426,7 @@ private:
 
   /* ---------- Member ---------- */
   Cfg cfg_;
-  Font *font_big_{nullptr}, *font_small_{nullptr};
+  mutable Font *font_big_{nullptr}, *font_small_{nullptr};
 
   /* ------------------------------------------------------------------
    *  Hilfsfunktion: zerlegt "target/current/mode" in 3 Teile
@@ -448,6 +455,15 @@ private:
     return (old[0] == neu[0]) && // target gleich
            (old[2] == neu[2]) && // mode   gleich
            (old[1] != neu[1]);   // **nur current anders**
+  }
+
+  void ensure_fonts_() const
+  {
+    if (font_big_ != nullptr && font_small_ != nullptr)
+      return;
+    const float hpx = float(ctx_.scr_h) / float(std::max(ctx_.rows, 1));
+    font_big_ = ctx_.get_font_for_size(hpx * 0.22f);
+    font_small_ = ctx_.get_font_for_size(hpx * 0.12f);
   }
 };
 

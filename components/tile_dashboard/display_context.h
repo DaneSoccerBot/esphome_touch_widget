@@ -26,7 +26,7 @@
 #include "esphome/components/font/font.h"
 
 #include "colors.h"
-#include "tile/tile_bg_renderer.h"
+#include "tile_bg_renderer.h"
 
 // Kurzer Alias, damit der Code übersichtlicher bleibt
 using esphome::font::Font;
@@ -103,6 +103,28 @@ struct DisplayContext
         if (pt < 85)
             return roboto_80;
         return roboto_90; // größter Font
+    }
+
+    void set_roboto_fonts(Font *f12, Font *f14, Font *f16, Font *f18,
+                          Font *f20, Font *f25, Font *f30, Font *f35,
+                          Font *f40, Font *f45, Font *f50, Font *f60,
+                          Font *f70, Font *f80, Font *f90)
+    {
+        roboto_12 = f12;
+        roboto_14 = f14;
+        roboto_16 = f16;
+        roboto_18 = f18;
+        roboto_20 = f20;
+        roboto_25 = f25;
+        roboto_30 = f30;
+        roboto_35 = f35;
+        roboto_40 = f40;
+        roboto_45 = f45;
+        roboto_50 = f50;
+        roboto_60 = f60;
+        roboto_70 = f70;
+        roboto_80 = f80;
+        roboto_90 = f90;
     }
 
     /**

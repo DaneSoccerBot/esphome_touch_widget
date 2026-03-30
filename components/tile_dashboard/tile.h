@@ -12,7 +12,7 @@
 #include "esphome/components/display/display.h"
 #include "colors.h"
 #include "display_context.h"
-#include "tile/tile_bg_renderer.h"
+#include "tile_bg_renderer.h"
 
 using esphome::display::Display;
 
@@ -34,6 +34,7 @@ public:
   uint8_t col() const { return col_; }
   uint8_t row() const { return row_; }
   uint8_t numTilesY() const { return numTilesY_; }
+  void bind_display(Display *disp) { disp_ = disp; }
 
   void draw(Display &it)
   {

@@ -1,0 +1,14 @@
+display:
+  - platform: sdl
+    id: dashboard_display
+    update_interval: 250ms
+    auto_clear_enabled: false
+    dimensions:
+      width: ${dashboard_width}
+      height: ${dashboard_height}
+
+touchscreen:
+  platform: sdl
+  id: dashboard_touchscreen
+  display: dashboard_display
+  sdl_id: dashboard_display

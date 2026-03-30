@@ -5,8 +5,9 @@
 #include <string>
 #include <cstring>  // snprintf, strcpy, strncat
 #include <cmath>    // std::isnan
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h" // Farbkonstanten
+#include "esphome/components/sensor/sensor.h"
 
 //==============================================================================
 //  DoubleValueTile – zeigt zwei Werte übereinander in einer Kachel
@@ -14,6 +15,40 @@
 class DoubleValueTile : public Tile
 {
 public:
+    struct Cfg
+    {
+        esphome::sensor::Sensor *top_value{nullptr};
+        esphome::sensor::Sensor *bottom_value{nullptr};
+    };
+
+    DoubleValueTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+                    std::string top_label,
+                    std::string bottom_label,
+                    std::string top_unit,
+                    std::string bottom_unit,
+                    std::string fmt_top,
+                    std::string fmt_bottom,
+                    const Cfg &cfg)
+        : Tile(ctx, col, row, (uint8_t)2),
+          cfg_(cfg), top_label_(std::move(top_label)), bottom_label_(std::move(bottom_label)), top_unit_(std::move(top_unit)), bottom_unit_(std::move(bottom_unit)), fmt_top_(std::move(fmt_top)), fmt_bottom_(std::move(fmt_bottom)), prev_top_(NAN), prev_bottom_(NAN)
+    {
+        this->bind_sensors_();
+    }
+
+    DoubleValueTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+                    std::string top_label,
+                    std::string bottom_label,
+                    std::string top_unit,
+                    std::string bottom_unit,
+                    std::string fmt_top = "%.1f",
+                    std::string fmt_bottom = "%.1f")
+        : DoubleValueTile(ctx, col, row,
+                          std::move(top_label), std::move(bottom_label),
+                          std::move(top_unit), std::move(bottom_unit),
+                          std::move(fmt_top), std::move(fmt_bottom), Cfg{})
+    {
+    }
+
     DoubleValueTile(uint8_t col, uint8_t row,
                     std::string top_label,
                     std::string bottom_label,
@@ -21,13 +56,15 @@ public:
                     std::string bottom_unit,
                     const char *fmt_top = "%.1f",
                     const char *fmt_bottom = "%.1f")
-        : Tile(get_display_ctx(), col, row, (uint8_t)2),
-          top_label_(std::move(top_label)), bottom_label_(std::move(bottom_label)), top_unit_(std::move(top_unit)), bottom_unit_(std::move(bottom_unit)), fmt_top_(fmt_top), fmt_bottom_(fmt_bottom), prev_top_(NAN), prev_bottom_(NAN)
+        : DoubleValueTile(get_display_ctx(), col, row,
+                          std::move(top_label), std::move(bottom_label),
+                          std::move(top_unit), std::move(bottom_unit),
+                          fmt_top, fmt_bottom, {})
     {
     }
 
-    void set_top_value(float v) { top_value_ = v; }
-    void set_bottom_value(float v) { bottom_value_ = v; }
+    void set_top_value(float v) { top_value_ = v; request_redraw(); }
+    void set_bottom_value(float v) { bottom_value_ = v; request_redraw(); }
 
 protected:
     void render_update(Display &it) override
@@ -59,18 +96,18 @@ protected:
         const int y0 = abs_y();
         const int w = tile_w();
         const int h = tile_h();
-        if (!formatted_equals(prev_top_, top_value_, fmt_top_, top_unit_)) {
+        if (!formatted_equals(prev_top_, top_value_, fmt_top_.c_str(), top_unit_)) {
             auto [cx0, cy0, cx1, cy1] = top_value_clip();
             it.start_clipping(cx0, cy0, cx1, cy1);
             ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
-            render_value(it, h * 0.2f, fmt_top_, top_unit_, top_value_);
+            render_value(it, h * 0.2f, fmt_top_.c_str(), top_unit_, top_value_);
             it.end_clipping();
         }
-        if (!formatted_equals(prev_bottom_, bottom_value_, fmt_bottom_, bottom_unit_)) {
+        if (!formatted_equals(prev_bottom_, bottom_value_, fmt_bottom_.c_str(), bottom_unit_)) {
             auto [cx0, cy0, cx1, cy1] = bottom_value_clip();
             it.start_clipping(cx0, cy0, cx1, cy1);
             ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
-            render_value(it, h * 0.7f, fmt_bottom_, bottom_unit_, bottom_value_);
+            render_value(it, h * 0.7f, fmt_bottom_.c_str(), bottom_unit_, bottom_value_);
             it.end_clipping();
         }
         prev_top_    = top_value_;
@@ -81,8 +118,6 @@ protected:
     std::string make_cache_key() const override
     {
         char key[64];
-        const char *t1 = std::isnan(top_value_) ? "NAN" : fmt_top_;
-        const char *t2 = std::isnan(bottom_value_) ? "NAN" : fmt_bottom_;
         std::snprintf(key, sizeof(key), "%s%f|%s%f",
                       top_unit_.c_str(), top_value_,
                       bottom_unit_.c_str(), bottom_value_);
@@ -90,10 +125,31 @@ protected:
     }
 
 private:
+    void bind_sensors_()
+    {
+        if (cfg_.top_value != nullptr)
+        {
+            top_value_ = cfg_.top_value->state;
+            cfg_.top_value->add_on_state_callback([this](float value)
+                                                  {
+                this->top_value_ = value;
+                this->request_redraw(); });
+        }
+        if (cfg_.bottom_value != nullptr)
+        {
+            bottom_value_ = cfg_.bottom_value->state;
+            cfg_.bottom_value->add_on_state_callback([this](float value)
+                                                     {
+                this->bottom_value_ = value;
+                this->request_redraw(); });
+        }
+    }
+
+    Cfg cfg_;
     float top_value_{NAN}, bottom_value_{NAN};
     std::string top_label_, bottom_label_;
     std::string top_unit_, bottom_unit_;
-    const char *fmt_top_, *fmt_bottom_;
+    std::string fmt_top_, fmt_bottom_;
     float prev_top_,  prev_bottom_;
 
     std::tuple<int, int, int, int> top_value_clip() const
@@ -125,7 +181,7 @@ private:
         {
             // Wert + Einheit
             char buf[32];
-            if (!std::isnan(top_value_))
+            if (!std::isnan(value))
                 std::snprintf(buf, sizeof(buf), fmt, value);
             else
                 std::strcpy(buf, "N/A");

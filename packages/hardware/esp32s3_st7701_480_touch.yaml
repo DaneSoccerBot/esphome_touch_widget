@@ -1,0 +1,87 @@
+i2c:
+  - id: bus_a
+    sda: GPIO19
+    scl: GPIO45
+
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO48
+    mosi_pin: GPIO47
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+output:
+  - platform: ledc
+    pin: GPIO38
+    id: backlight
+    frequency: 100Hz
+
+light:
+  - platform: monochromatic
+    output: backlight
+    name: ${friendly_name} Backlight
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+
+pca9554:
+  - id: p_c_a
+    pin_count: 16
+    address: 0x20
+
+touchscreen:
+  platform: gt911
+  id: dashboard_touchscreen
+  display: dashboard_display
+  transform:
+    mirror_x: true
+    mirror_y: true
+
+display:
+  - platform: st7701s
+    id: dashboard_display
+    rotation: 0
+    update_interval: 1s
+    auto_clear_enabled: false
+    data_rate: 8MHz
+    spi_mode: MODE3
+    color_order: RGB
+    dimensions:
+      width: ${dashboard_width}
+      height: ${dashboard_height}
+    invert_colors: false
+    transform:
+      mirror_x: true
+      mirror_y: true
+    cs_pin: 39
+    reset_pin:
+      pca9554: p_c_a
+      number: 5
+    de_pin: 18
+    hsync_pin: 16
+    vsync_pin: 17
+    pclk_pin: 21
+    init_sequence:
+      - 1
+      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x10]
+      - [0xCD, 0x00]
+    pclk_frequency: 12MHz
+    pclk_inverted: false
+    data_pins:
+      red: [11, 12, 13, 14, 0]
+      green: [8, 20, 3, 46, 9, 10]
+      blue: [4, 5, 6, 7, 15]

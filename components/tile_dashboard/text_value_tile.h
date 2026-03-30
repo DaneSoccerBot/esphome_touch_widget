@@ -5,28 +5,53 @@
 #include <string>
 #include <cstring>   // snprintf / strncat
 #include <cmath>     // std::isnan
-#include "tile/tile.h"
+#include "tile.h"
+#include "esphome/components/sensor/sensor.h"
 
 //==============================================================================
 //  TextValueTile  –  kompakte Zahl + Einheit (früher CompactValueTile)
 //==============================================================================
 class TextValueTile : public Tile {
 public:
+  struct Cfg {
+    esphome::sensor::Sensor *value{nullptr};
+  };
+
+  TextValueTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+                std::string label,
+                std::string unit,
+                std::string fmt,
+                const Cfg &cfg)
+      : Tile(ctx, col, row, (uint8_t)1, std::move(label)),
+        cfg_(cfg), unit_(std::move(unit)), fmt_(std::move(fmt)) {
+    this->bind_sensor_();
+  }
+
+  TextValueTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+                std::string label,
+                std::string unit,
+                std::string fmt = "%.1f")
+      : TextValueTile(ctx, col, row, std::move(label), std::move(unit),
+                      std::move(fmt), Cfg{}) {}
+
   TextValueTile(uint8_t col, uint8_t row,
                 std::string label,
                 std::string unit,
                 const char *fmt = "%.1f")
-      : Tile(get_display_ctx(), col, row, (uint8_t)1, std::move(label)),
-        unit_(std::move(unit)), fmt_(fmt) {}
+      : TextValueTile(get_display_ctx(), col, row, std::move(label),
+                      std::move(unit), fmt, {}) {}
 
-  void set_value(float v) { value_ = v; }
+  void set_value(float v) {
+    value_ = v;
+    request_redraw();
+  }
 
 protected:
   // ----- Inhalt zeichnen -----------------------------------------------------
   void draw_content(Display &it) override {
     char buf[32];
     if (!std::isnan(value_))
-      snprintf(buf, sizeof(buf), fmt_, value_);
+      snprintf(buf, sizeof(buf), fmt_.c_str(), value_);
     else
       strcpy(buf, "N/A");
     strncat(buf, unit_.c_str(), sizeof(buf) - strlen(buf) - 1);
@@ -57,9 +82,20 @@ protected:
   }
 
 private:
+  void bind_sensor_() {
+    if (cfg_.value == nullptr)
+      return;
+    value_ = cfg_.value->state;
+    cfg_.value->add_on_state_callback([this](float value) {
+      this->value_ = value;
+      this->request_redraw();
+    });
+  }
+
+  Cfg cfg_;
   float value_{NAN};
   std::string unit_;
-  const char *fmt_;
+  std::string fmt_;
 };
 
 #endif  // TEXT_VALUE_TILE_H

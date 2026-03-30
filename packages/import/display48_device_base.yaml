@@ -1,0 +1,12 @@
+substitutions:
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: INFO
+  dashboard_font_file: gfonts://Roboto Condensed
+  tile_dashboard_components_source: github://OWNER/esphome_touch_widget/components@main
+  touch_rotation: "0"
+  dashboard_width: "480"
+  dashboard_height: "480"
+
+packages:
+  device: !include ../device/display48_device_base.yaml

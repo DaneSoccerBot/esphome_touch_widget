@@ -1,0 +1,120 @@
+substitutions:
+  device_name: dashboard-simulator
+  friendly_name: Dashboard Simulator
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: DEBUG
+  dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
+  tile_dashboard_components_source: ../components
+  touch_rotation: "0"
+  dashboard_width: "480"
+  dashboard_height: "480"
+  climate_room_entity: climate.simulator_office
+  climate_meeting_entity: climate.simulator_meeting
+  climate_room_label: OFFICE DANE
+  climate_meeting_label: MEETING ROOM
+  light_switch_entity: switch.simulator_light
+  switch_label: DEMO LIGHT
+
+packages:
+  device: !include ../packages/device/simulator_device_base.yaml
+
+sensor:
+  - platform: template
+    id: battery_percent
+    name: "${friendly_name} Battery"
+    accuracy_decimals: 0
+    update_interval: 2s
+    lambda: |-
+      return 65.0f + 25.0f * std::sin(float(millis()) / 7000.0f);
+
+  - platform: template
+    id: strompreis_aktuell
+    name: "${friendly_name} Strompreis"
+    accuracy_decimals: 2
+    update_interval: 2s
+    lambda: |-
+      return 0.18f + 0.09f * (0.5f + 0.5f * std::sin(float(millis()) / 5000.0f));
+
+text_sensor:
+  - platform: template
+    id: climate_room_payload
+    name: "${friendly_name} Office Climate"
+    update_interval: 1s
+    lambda: |-
+      float target = 21.5f + 1.0f * std::sin(float(millis()) / 9000.0f);
+      float current = 20.5f + 1.2f * std::sin(float(millis()) / 11000.0f);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: climate_meeting_payload
+    name: "${friendly_name} Meeting Climate"
+    update_interval: 1s
+    lambda: |-
+      float target = 20.0f + 0.5f * std::sin(float(millis()) / 8000.0f);
+      float current = 19.0f + 1.0f * std::sin(float(millis()) / 12000.0f);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"auto\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+switch:
+  - platform: template
+    id: dashboard_light_switch
+    name: "${friendly_name} Demo Light"
+    optimistic: true
+
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 2
+  rows: 2
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: ${dashboard_font_file}
+  tiles:
+    - type: climate
+      col: 1
+      row: 1
+      label: ${climate_meeting_label}
+      payload: climate_meeting_payload
+      entity_id: ${climate_meeting_entity}
+
+    - type: climate
+      col: 2
+      row: 1
+      label: ${climate_room_label}
+      payload: climate_room_payload
+      entity_id: ${climate_room_entity}
+
+    - type: switch
+      col: 1
+      row: 2
+      label: ${switch_label}
+      switch: dashboard_light_switch
+      entity_id: ${light_switch_entity}
+
+    - type: double_value
+      col: 2
+      row: 2
+      top_label: AKKU
+      bottom_label: STROMPREIS
+      top_sensor: battery_percent
+      bottom_sensor: strompreis_aktuell
+      top_unit: "%"
+      bottom_unit: "€"
+      top_format: "%.0f"
+      bottom_format: "%.2f"

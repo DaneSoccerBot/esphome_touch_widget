@@ -2,7 +2,7 @@
 #define SWITCH_TILE_H
 
 #include <string>
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/api/api_server.h"
@@ -21,14 +21,22 @@ class SwitchTile : public Tile {
     std::string               entity_id;
   };
 
-  SwitchTile(uint8_t col, uint8_t row,
+  SwitchTile(DisplayContext &ctx, uint8_t col, uint8_t row,
              std::string label,
              const Cfg &cfg)
-    : Tile(get_display_ctx(), col, row, /* numTilesY=*/1, std::move(label))
+    : Tile(ctx, col, row, /* numTilesY=*/1, std::move(label))
     , cfg_(cfg)
   {
     add_touch_handler(TouchArea::ANY, [this]() { this->toggle(); });
+    if (cfg_.sw != nullptr) {
+      cfg_.sw->add_on_state_callback([this](bool) { this->request_redraw(); });
+    }
   }
+
+  SwitchTile(uint8_t col, uint8_t row,
+             std::string label,
+             const Cfg &cfg)
+    : SwitchTile(get_display_ctx(), col, row, std::move(label), cfg) {}
 
  protected:
  void draw_content(Display &it) override {
@@ -53,7 +61,8 @@ class SwitchTile : public Tile {
  private:
   void toggle() {
     const bool on = cfg_.sw && cfg_.sw->state;
-    cfg_.sw->state = !on;
+    if (cfg_.sw != nullptr)
+      cfg_.sw->publish_state(!on);
     ESP_LOGD("Switch", "Setting switch state to %s", on ? "OFF" : "ON");
     request_redraw();
     api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);

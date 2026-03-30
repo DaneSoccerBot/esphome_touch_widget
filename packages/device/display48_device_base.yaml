@@ -1,0 +1,14 @@
+font:
+  - file: ${dashboard_font_file}
+    id: tile_dashboard_device_bootstrap_font
+    size: 12
+    glyphs:
+      - "A"
+
+packages:
+  base: !include ../base/tile_dashboard_base.yaml
+  hardware: !include ../hardware/esp32s3_st7701_480_touch.yaml
+
+external_components:
+  - source: ${tile_dashboard_components_source}
+    components: [tile_dashboard]

@@ -1,30 +1,38 @@
-# ESPHome / PlatformIO Build-Artefakte
+# Build-Artefakte
 **/.esphome/
 .pio/
 *.pioenvs/
 build/
+dist/
 *.bin
 *.elf
+*.map
 *.uf2
 
-# Entwicklungsumgebungen
-.vscode/
+# Python / lokale Tooling-Artefakte
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
 venv/
 .venv/
 
-# Temporäre & OS-Dateien
+# Editor / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
-__pycache__/
-*.pyc
 *.log
 *_crash.*
 
-# Projekt-Ordner, die du bewusst ausschließen willst
+# Lokale Archive / Worktrees
 removed/
 
-# Vertrauliche Infos
+# Lokale Secrets und gerätespezifische Alt-Konfigurationen
 secrets.yaml
+secrets.*.yaml
 debug.yaml
 debug2.yaml
 debug3.yaml
@@ -32,3 +40,15 @@ debug4.yaml
 debug5.yaml
 debug5_simulator.yaml
 display48norelay.yaml
+480.yaml
+480_crash.yaml
+esphome.yaml
+img_script.py
+
+# Nicht mehr gepflegte Altpfade, lokal behalten aber nicht versionieren
+components/tile_dashboard/tile/
+packages/apps/
+packages/layouts/
+packages/profiles/
+packages/base/tile_dashboard_adoptable_base.yaml
+projects/

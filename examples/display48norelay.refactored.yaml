@@ -1,0 +1,98 @@
+substitutions:
+  device_name: display48norelay
+  friendly_name: Display 48 No Relay
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: DEBUG
+  dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
+  tile_dashboard_components_source: ../components
+  wifi_ssid: YOUR_WIFI_SSID
+  wifi_password: YOUR_WIFI_PASSWORD
+  api_encryption_key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+  ota_password: YOUR_OTA_PASSWORD
+  touch_rotation: "0"
+  dashboard_width: "480"
+  dashboard_height: "480"
+
+  climate_room_payload_sensor: sensor.climate_payload_dane_office
+  climate_meeting_payload_sensor: sensor.climate_payload_meeting_room
+  climate_room_entity: climate.better_thermostat_dane
+  climate_meeting_entity: climate.thermostat_meetingraum_thermostat
+  climate_room_label: OFFICE DANE
+  climate_meeting_label: MEETING ROOM
+  battery_percent_entity: sensor.victron_system_battery_soc
+  strompreis_entity: sensor.strompreis_aktuell
+  light_switch_entity: switch.display4848_480display_relay
+  switch_label: LICHT DANE
+
+packages:
+  device: !include ../packages/device/display48_device_base.yaml
+
+sensor:
+  - platform: homeassistant
+    entity_id: ${battery_percent_entity}
+    id: battery_percent
+
+  - platform: homeassistant
+    entity_id: ${strompreis_entity}
+    id: strompreis_aktuell
+
+text_sensor:
+  - platform: homeassistant
+    id: climate_room_payload
+    entity_id: ${climate_room_payload_sensor}
+    internal: true
+
+  - platform: homeassistant
+    id: climate_meeting_payload
+    entity_id: ${climate_meeting_payload_sensor}
+    internal: true
+
+switch:
+  - platform: homeassistant
+    entity_id: ${light_switch_entity}
+    id: dashboard_light_switch
+
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 2
+  rows: 2
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: ${dashboard_font_file}
+  tiles:
+    - type: climate
+      col: 1
+      row: 1
+      label: ${climate_meeting_label}
+      payload: climate_meeting_payload
+      entity_id: ${climate_meeting_entity}
+
+    - type: climate
+      col: 2
+      row: 1
+      label: ${climate_room_label}
+      payload: climate_room_payload
+      entity_id: ${climate_room_entity}
+
+    - type: switch
+      col: 1
+      row: 2
+      label: ${switch_label}
+      switch: dashboard_light_switch
+      entity_id: ${light_switch_entity}
+
+    - type: double_value
+      col: 2
+      row: 2
+      top_label: AKKU
+      bottom_label: STROMPREIS
+      top_sensor: battery_percent
+      bottom_sensor: strompreis_aktuell
+      top_unit: "%"
+      bottom_unit: "€"
+      top_format: "%.0f"
+      bottom_format: "%.2f"

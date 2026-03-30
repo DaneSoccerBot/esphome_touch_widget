@@ -5,8 +5,9 @@
 #include <algorithm> // std::clamp
 #include <cmath>     // std::round
 #include <cstdio>    // std::snprintf
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h"  // Color definitions
+#include "esphome/components/sensor/sensor.h"
 
 using esphome::display::Display;
 
@@ -16,10 +17,30 @@ using esphome::display::Display;
 class BatteryTile : public Tile
 {
 public:
-  BatteryTile(uint8_t col, uint8_t row, std::string label = "BATTERY")
-      : Tile(get_display_ctx(), col, row, (uint8_t)1, std::move(label)) {}
+  struct Cfg
+  {
+    esphome::sensor::Sensor *level{nullptr};
+  };
 
-  void set_level(float pct) { level_ = pct; }
+  BatteryTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+              std::string label, const Cfg &cfg)
+      : Tile(ctx, col, row, (uint8_t)1, std::move(label)), cfg_(cfg)
+  {
+    this->bind_sensor_();
+  }
+
+  BatteryTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+              std::string label = "BATTERY")
+      : BatteryTile(ctx, col, row, std::move(label), Cfg{}) {}
+
+  BatteryTile(uint8_t col, uint8_t row, std::string label = "BATTERY")
+      : BatteryTile(get_display_ctx(), col, row, std::move(label), {}) {}
+
+  void set_level(float pct)
+  {
+    level_ = pct;
+    request_redraw();
+  }
 
 protected:
   void render_update(Display &it) override
@@ -104,6 +125,18 @@ protected:
   }
 
 private:
+  void bind_sensor_()
+  {
+    if (cfg_.level == nullptr)
+      return;
+    level_ = cfg_.level->state;
+    cfg_.level->add_on_state_callback([this](float value)
+                                      {
+      this->level_ = value;
+      this->request_redraw(); });
+  }
+
+  Cfg cfg_;
   float level_{-1.0f};
   float prev_val_{NAN};
 };

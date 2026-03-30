@@ -4,7 +4,7 @@
 #include "esphome.h"
 #include "esphome/components/display/display.h"
 #include "colors.h"
-#include "tile/draw_utils.h" // DrawUtils::draw_rounded_rect
+#include "draw_utils.h" // DrawUtils::draw_rounded_rect
 
 class TileBackgroundRenderer
 {

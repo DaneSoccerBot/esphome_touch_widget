@@ -2,7 +2,7 @@
 #define LIGHT_TILE_H
 
 #include <string>
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/api/api_server.h"
@@ -23,15 +23,25 @@ public:
     std::string entity_id;                   // light.led_strip_kuche
   };
 
-  LightTile(uint8_t col, uint8_t row,
+  LightTile(DisplayContext &ctx, uint8_t col, uint8_t row,
             std::string label,
             const Cfg &cfg)
-      : Tile(get_display_ctx(), col, row, 1, std::move(label)), cfg_(cfg)
+      : Tile(ctx, col, row, 1, std::move(label)), cfg_(cfg)
   {
     // Touch‑Handler → toggeln
     add_touch_handler(TouchArea::ANY, [this]
                       { this->toggle(); });
+    if (cfg_.state != nullptr)
+    {
+      cfg_.state->add_on_state_callback([this](const std::string &)
+                                        { this->request_redraw(); });
+    }
   }
+
+  LightTile(uint8_t col, uint8_t row,
+            std::string label,
+            const Cfg &cfg)
+      : LightTile(get_display_ctx(), col, row, std::move(label), cfg) {}
 
 protected:
   bool is_on() const
@@ -66,10 +76,8 @@ private:
   void toggle()
   {
     bool on = is_on();
-    if (on)
-      cfg_.state->state = "off";
-    else
-      cfg_.state->state = "on";
+    if (cfg_.state != nullptr)
+      cfg_.state->publish_state(on ? "off" : "on");
     ESP_LOGD("Switch", "Setting switch state to %s", on ? "OFF" : "ON");
     request_redraw();
 

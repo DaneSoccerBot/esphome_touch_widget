@@ -7,8 +7,9 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
-#include "tile/tile.h"
+#include "tile.h"
 #include "colors.h" // Farbkonstanten
+#include "esphome/components/sensor/sensor.h"
 
 using esphome::display::Display;
 using esphome::font::Font;
@@ -24,20 +25,34 @@ public:
     float red{0}, yellow{0};
   };
 
+  struct Cfg
+  {
+    esphome::sensor::Sensor *value{nullptr};
+    float min_v{0.0f};
+    float max_v{100.0f};
+    Thresholds thresholds{};
+    std::string unit{"%"};
+    std::string format{"%.1f"};
+  };
+
+  GaugeTile(DisplayContext &ctx, uint8_t col, uint8_t row,
+            std::string label, const Cfg &cfg)
+      : Tile(ctx, col, row, (uint8_t)1, std::move(label)),
+        cfg_(cfg), min_(cfg.min_v), max_(cfg.max_v), thr_(cfg.thresholds),
+        unit_(cfg.unit), fmt_(cfg.format)
+  {
+    this->bind_sensor_();
+  }
+
   GaugeTile(uint8_t col, uint8_t row, std::string label,
             float min_v, float max_v, Thresholds thr,
             std::string unit = "%", const char *fmt = "%.1f")
-      : Tile(get_display_ctx(), col, row, (uint8_t)1, std::move(label)),
-        min_(min_v), max_(max_v), thr_(thr),
-        unit_(std::move(unit)), fmt_(fmt)
+      : GaugeTile(get_display_ctx(), col, row, std::move(label),
+                  Cfg{nullptr, min_v, max_v, thr, std::move(unit), fmt})
   {
-    // Font für Gauge-Wert berechnen, analog DisplayContext::set_grid
-    auto &ctx = get_display_ctx();
-    float h = float(ctx.scr_h) / float(ctx.rows);
-    gauge_font_ = ctx.get_font_for_size(h * 0.25f);
   }
 
-  void set_value(float v) { val_ = v; }
+  void set_value(float v) { val_ = v; request_redraw(); }
 
 protected:
   void render_update(Display &it) override
@@ -47,6 +62,8 @@ protected:
 
   void draw_content(Display &it) override
   {
+    this->ensure_font_();
+
     const int x0 = abs_x();
     const int y0 = abs_y();
     const int w = tile_w();
@@ -94,14 +111,14 @@ protected:
       it.end_clipping();
       prev_gauge_val_ = val_;
     }
-    if (!formatted_equals(prev_val_, val_,fmt_, unit_))
+    if (!formatted_equals(prev_val_, val_, fmt_.c_str(), unit_))
     {
       auto [cx0, cy0, cx1, cy1] = number_value_clip();
       it.start_clipping(cx0, cy0, cx1, cy1);
       ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
       // Wert-Text
       char buf_val[16], buf_all[16];
-      std::snprintf(buf_val, sizeof(buf_val), fmt_, value);
+      std::snprintf(buf_val, sizeof(buf_val), fmt_.c_str(), value);
       std::snprintf(buf_all, sizeof(buf_all), "%s%s", buf_val, unit_.c_str());
       it.print(cx, cy + h * 0.18f,
                gauge_font_, Colors::TEXT,
@@ -116,15 +133,35 @@ protected:
   std::string make_cache_key() const override
   {
     char b[32];
-    std::snprintf(b, sizeof(b), fmt_, val_);
+    std::snprintf(b, sizeof(b), fmt_.c_str(), val_);
     return std::string(b);
   }
 
 private:
+  void bind_sensor_()
+  {
+    if (cfg_.value == nullptr)
+      return;
+    val_ = cfg_.value->state;
+    cfg_.value->add_on_state_callback([this](float value)
+                                      {
+      this->val_ = value;
+      this->request_redraw(); });
+  }
+
+  void ensure_font_()
+  {
+    if (gauge_font_ != nullptr)
+      return;
+    const float h = float(ctx_.scr_h) / float(std::max(ctx_.rows, 1));
+    gauge_font_ = ctx_.get_font_for_size(h * 0.25f);
+  }
+
+  Cfg cfg_;
   float val_{NAN}, min_, max_;
   Thresholds thr_;
   std::string unit_;
-  const char *fmt_;
+  std::string fmt_;
   Font *gauge_font_{nullptr};
   float prev_val_{NAN};
   float prev_gauge_val_{NAN};
