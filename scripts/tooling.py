@@ -96,7 +96,7 @@ def get_windows_sdl2_options(root: Path | None = None) -> str | None:
     # rename produces a C++-mangled symbol that SDL2main cannot resolve.
     # Drop the SDL_main wrapper flags; the native host entry point works
     # without WinMain.
-    drop = {"-Dmain=SDL_main", "-lSDL2main", "-lmingw32", "-mwindows"}
+    drop = {"-Dmain=SDL_main", "-lSDL2main", "-lmingw32"}
     sdl_flags = " ".join(t for t in sdl_flags.split() if t not in drop)
 
     # POSIX-to-Winsock2 shim headers for ESPHome host platform on Windows
