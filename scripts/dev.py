@@ -10,8 +10,10 @@ import venv
 from pathlib import Path
 
 from tooling import (
+    PLATFORMIO_CORE_DIR,
     ROOT,
     check_host_simulator_support,
+    detect_windows_msys2_root,
     require_venv,
     run,
     venv_esphome,
@@ -66,6 +68,10 @@ def cmd_doctor(_: argparse.Namespace) -> None:
     )
     print(f"Repository root: {ROOT}")
     print(f"Virtualenv: {venv_python()}")
+    print(f"PlatformIO core dir: {PLATFORMIO_CORE_DIR}")
+    if os.name == "nt":
+        msys2_root = detect_windows_msys2_root()
+        print(f"MSYS2 root: {msys2_root if msys2_root else 'not detected'}")
     if version.returncode == 0:
         print(version.stdout.strip())
     else:

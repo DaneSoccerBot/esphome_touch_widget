@@ -155,23 +155,27 @@ This creates a local `.venv`, installs the pinned ESPHome tooling from
 [`requirements-dev.txt`](requirements-dev.txt), and checks whether the host
 simulator environment is ready.
 
+On supported platforms, the bootstrap scripts also install the local simulator
+system dependencies automatically:
+
+- macOS: `brew install sdl2 pkg-config`
+- Ubuntu / Debian: `sudo apt install libsdl2-dev pkg-config`
+- Fedora: `sudo dnf install SDL2-devel pkgconf-pkg-config`
+- Arch: `sudo pacman -S sdl2 pkgconf`
+- Windows: installs MSYS2 with `winget`, then installs UCRT64 `gcc`, `pkgconf`,
+  and `SDL2` through `pacman`
+
 The bootstrap scripts call [`scripts/dev.py`](scripts/dev.py) internally. You
 can also use the Python entry point directly:
 
 - macOS / Linux: `python3 scripts/dev.py setup`
 - Windows: `py -3 scripts/dev.py setup`
 
-For the local simulator you still need system packages:
-
-- macOS: `brew install sdl2 pkg-config`
-- Ubuntu / Debian: `sudo apt install libsdl2-dev pkg-config`
-- Fedora: `sudo dnf install SDL2-devel pkgconf-pkg-config`
-- Arch: `sudo pacman -S sdl2 pkgconf`
-- Windows: the easiest path is WSL2 + WSLg; native host builds need SDL2,
-  `pkg-config`, and Visual Studio C++ build tools
-
 The new dev entry point wraps the common tasks without requiring manual
-activation of the virtual environment.
+activation of the virtual environment. On Windows it also injects the MSYS2
+UCRT64 toolchain paths automatically once bootstrap has completed. PlatformIO
+state is kept repo-local under `.cache/platformio`, so simulator builds do not
+depend on an existing `~/.platformio` setup.
 
 ### Simulator
 

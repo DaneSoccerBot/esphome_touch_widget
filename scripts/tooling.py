@@ -5,12 +5,12 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
+PLATFORMIO_CORE_DIR = ROOT / ".cache" / "platformio"
 
 
 def bin_dir() -> Path:
@@ -29,12 +29,84 @@ def venv_esphome() -> Path:
     return bin_dir() / f"esphome{exe_suffix()}"
 
 
+def build_platformio_env(
+    base_env: dict[str, str] | None = None, core_dir: Path = PLATFORMIO_CORE_DIR
+) -> dict[str, str]:
+    env = dict(base_env or {})
+    env.setdefault("PLATFORMIO_CORE_DIR", str(core_dir))
+    return env
+
+
+def detect_windows_msys2_root(candidates: list[Path] | None = None) -> Path | None:
+    if candidates is None:
+        candidates = []
+        explicit = os.environ.get("MSYS2_ROOT")
+        if explicit:
+            candidates.append(Path(explicit))
+        candidates.extend(
+            [
+                Path("C:/msys64"),
+                Path("D:/msys64"),
+            ]
+        )
+
+    for root in candidates:
+        bash_exe = root / "usr/bin/bash.exe"
+        if bash_exe.exists():
+            return root
+    return None
+
+
+def build_windows_msys2_env(
+    base_env: dict[str, str] | None = None, root: Path | None = None
+) -> dict[str, str]:
+    env = dict(base_env or {})
+    if root is None:
+        return env
+
+    ucrt_bin = root / "ucrt64/bin"
+    usr_bin = root / "usr/bin"
+    path_parts = [str(ucrt_bin), str(usr_bin)]
+    existing_path = env.get("PATH")
+    if existing_path:
+        path_parts.append(existing_path)
+    env["PATH"] = os.pathsep.join(path_parts)
+
+    pkg_paths = [
+        str(root / "ucrt64/lib/pkgconfig"),
+        str(root / "ucrt64/share/pkgconfig"),
+    ]
+    existing_pkg_path = env.get("PKG_CONFIG_PATH")
+    if existing_pkg_path:
+        pkg_paths.append(existing_pkg_path)
+    env["PKG_CONFIG_PATH"] = os.pathsep.join(pkg_paths)
+    env.setdefault("PKG_CONFIG_SYSTEM_INCLUDE_PATH", str(root / "ucrt64/include"))
+    env.setdefault("PKG_CONFIG_SYSTEM_LIBRARY_PATH", str(root / "ucrt64/lib"))
+    env.setdefault("MSYSTEM", "UCRT64")
+    env.setdefault("CHERE_INVOKING", "1")
+    return env
+
+
+def tooling_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    merged = build_platformio_env(os.environ)
+    if env:
+        merged.update(env)
+    merged = build_platformio_env(merged)
+    platformio_core_dir = Path(merged["PLATFORMIO_CORE_DIR"])
+    platformio_core_dir.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        merged = build_windows_msys2_env(
+            merged, detect_windows_msys2_root()
+        )
+    return merged
+
+
 def run(cmd: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     print("+", " ".join(str(part) for part in cmd))
     completed = subprocess.run(
         [str(part) for part in cmd],
         cwd=ROOT,
-        env=env,
+        env=tooling_env(env),
         text=True,
     )
     if completed.returncode != 0:
@@ -53,7 +125,7 @@ def require_venv() -> None:
 def host_simulator_hint() -> str:
     system = platform.system()
     if system == "Darwin":
-        return "Install host simulator deps with `brew install sdl2 pkg-config`."
+        return "Run `./scripts/bootstrap.sh` to install `sdl2` and `pkg-config` automatically."
     if system == "Linux":
         try:
             os_release = platform.freedesktop_os_release()
@@ -61,25 +133,26 @@ def host_simulator_hint() -> str:
             os_release = {}
         distro = os_release.get("ID", "").lower()
         if distro in {"ubuntu", "debian", "linuxmint", "pop"}:
-            return "Install host simulator deps with `sudo apt install libsdl2-dev pkg-config`."
+            return "Run `./scripts/bootstrap.sh` to install `libsdl2-dev` and `pkg-config` automatically."
         if distro in {"fedora", "rhel", "centos"}:
-            return "Install host simulator deps with `sudo dnf install SDL2-devel pkgconf-pkg-config`."
+            return "Run `./scripts/bootstrap.sh` to install `SDL2-devel` and `pkgconf-pkg-config` automatically."
         if distro in {"arch", "manjaro"}:
-            return "Install host simulator deps with `sudo pacman -S sdl2 pkgconf`."
+            return "Run `./scripts/bootstrap.sh` to install `sdl2` and `pkgconf` automatically."
         return "Install host simulator deps: SDL2 development headers and `pkg-config`."
     return (
-        "For Windows, the easiest host-simulator path is WSL2 + WSLg. "
-        "Native Windows host builds need SDL2, pkg-config, and Visual Studio C++ build tools."
+        "Run `scripts\\bootstrap.ps1` to install MSYS2 plus the UCRT64 SDL2, pkgconf, and GCC packages."
     )
 
 
 def check_host_simulator_support() -> tuple[bool, str]:
-    pkg_config = shutil.which("pkg-config")
+    env = tooling_env()
+    pkg_config = shutil.which("pkg-config", path=env.get("PATH"))
     if pkg_config is None:
         return False, host_simulator_hint()
     result = subprocess.run(
         [pkg_config, "--exists", "sdl2"],
         cwd=ROOT,
+        env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         text=True,
