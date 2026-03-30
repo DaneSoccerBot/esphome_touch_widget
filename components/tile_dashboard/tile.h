@@ -41,10 +41,21 @@ public:
   uint8_t numTilesY() const { return numTilesY_; }
   uint8_t page() const { return page_; }
   void set_page(uint8_t p) { page_ = p; }
+  uint8_t colspan() const { return colspan_; }
+  uint8_t rowspan() const { return rowspan_; }
+  void set_colspan(uint8_t c) { colspan_ = std::max<uint8_t>(c, 1); }
+  void set_rowspan(uint8_t r) { rowspan_ = std::max<uint8_t>(r, 1); }
+  void set_tile_idx(int idx) { tile_idx_ = idx; }
   bool fullscreen_enabled() const { return fullscreen_enabled_; }
   void set_fullscreen_enabled(bool v) { fullscreen_enabled_ = v; }
   bool is_fullscreen() const { return override_geo_.has_value(); }
   void bind_display(Display *disp) { disp_ = disp; }
+
+  /** Check whether the grid cell (c, r) falls inside this tile's span. */
+  bool contains_cell(uint8_t c, uint8_t r) const {
+    return c >= col_ && c < col_ + colspan_ &&
+           r >= row_ && r < row_ + rowspan_;
+  }
 
   void set_override_geometry(OverrideGeometry geo) {
     override_geo_ = geo;
@@ -221,16 +232,18 @@ protected:
                                 rounded ? radius : 0, border);
   }
 
-  int tile_w() const { return override_geo_ ? override_geo_->w : ctx_.tile_w(); }
-  int tile_h() const { return override_geo_ ? override_geo_->h : ctx_.tile_h(); }
+  int tile_w() const { return override_geo_ ? override_geo_->w : ctx_.tile_w() * colspan_; }
+  int tile_h() const { return override_geo_ ? override_geo_->h : ctx_.tile_h() * rowspan_; }
   int abs_x() const { return override_geo_ ? override_geo_->x : ctx_.x0 + (col_ - 1) * ctx_.tile_w(); }
   int abs_y() const { return override_geo_ ? override_geo_->y : ctx_.y0 + (row_ - 1) * ctx_.tile_h(); }
-  int tile_index() const { return (row_ - 1) * ctx_.cols + (col_ - 1); }
+  int tile_index() const { return tile_idx_; }
 
 protected:
   DisplayContext &ctx_;
   uint8_t col_, row_, numTilesY_;
   uint8_t page_{0};
+  uint8_t colspan_{1}, rowspan_{1};
+  int tile_idx_{0};
   std::string label_;
   std::string label2_;
   Display *disp_{nullptr};

@@ -42,12 +42,31 @@ using esphome::display::Display;
 //==============================================================================
 class Dashboard {
 public:
+  struct PageGrid { uint8_t cols, rows; };
+
   explicit Dashboard(DisplayContext &ctx):ctx_(ctx){}
 
   template<class T, class... Args>
   T &add_tile(Args&&...args){
     auto u=std::make_unique<T>(std::forward<Args>(args)...);
-    T &ref=*u; tiles_.push_back(std::move(u)); return ref;
+    T &ref=*u;
+    ref.set_tile_idx(static_cast<int>(tiles_.size()));
+    tiles_.push_back(std::move(u));
+    return ref;
+  }
+
+  // --- Page grid configuration ---
+  void set_default_grid(uint8_t cols, uint8_t rows) {
+    default_cols_ = std::max<uint8_t>(cols, 1);
+    default_rows_ = std::max<uint8_t>(rows, 1);
+  }
+  void set_page_grid(uint8_t page, uint8_t cols, uint8_t rows) {
+    page_grids_[page] = {std::max<uint8_t>(cols, 1), std::max<uint8_t>(rows, 1)};
+  }
+  std::pair<uint8_t, uint8_t> page_grid(uint8_t page) const {
+    auto it = page_grids_.find(page);
+    if (it != page_grids_.end()) return {it->second.cols, it->second.rows};
+    return {default_cols_, default_rows_};
   }
 
   void draw(Display &it){
@@ -56,6 +75,7 @@ public:
       draw_close_button_(it);
       return;
     }
+    apply_page_grid_(active_page_);
     for(auto &t:tiles_){
       if (t->page() == active_page_) t->draw(it);
     }
@@ -84,6 +104,7 @@ public:
   uint8_t num_pages() const {
     uint8_t max_page = 0;
     for (auto &t : tiles_) max_page = std::max(max_page, t->page());
+    for (auto &kv : page_grids_) max_page = std::max(max_page, kv.first);
     return max_page + 1;
   }
 
@@ -121,9 +142,10 @@ public:
       return;
     }
     for(auto &t:tiles_){
-      if(t->page() == active_page_ && t->col()==col && t->row()==row){
+      if(t->page() == active_page_ && t->contains_cell(col, row)){
+        const auto [tlx, tly] = span_local_(t.get(), col, row, local_x, local_y);
         if (t->fullscreen_enabled()) { enter_fullscreen(t.get()); return; }
-        t->dispatch_touch(local_x, local_y);
+        t->dispatch_touch(tlx, tly);
         break;
       }
     }
@@ -135,8 +157,9 @@ public:
       return;
     }
     for(auto &t:tiles_){
-      if(t->page() == active_page_ && t->col()==col && t->row()==row){
-        t->dispatch_touch_update(local_x, local_y);
+      if(t->page() == active_page_ && t->contains_cell(col, row)){
+        const auto [tlx, tly] = span_local_(t.get(), col, row, local_x, local_y);
+        t->dispatch_touch_update(tlx, tly);
         break;
       }
     }
@@ -148,8 +171,9 @@ public:
       return;
     }
     for(auto &t:tiles_){
-      if(t->page() == active_page_ && t->col()==col && t->row()==row){
-        t->dispatch_touch_release(local_x, local_y);
+      if(t->page() == active_page_ && t->contains_cell(col, row)){
+        const auto [tlx, tly] = span_local_(t.get(), col, row, local_x, local_y);
+        t->dispatch_touch_release(tlx, tly);
         break;
       }
     }
@@ -161,6 +185,25 @@ private:
   static constexpr int DOT_RADIUS = 4;
   static constexpr int DOT_SPACING = 14;
   static constexpr int DOT_BOTTOM_MARGIN = 10;
+
+  uint8_t default_cols_{1}, default_rows_{1};
+  std::map<uint8_t, PageGrid> page_grids_;
+
+  void apply_page_grid_(uint8_t page) {
+    auto [c, r] = page_grid(page);
+    ctx_.apply_page_grid(c, r);
+  }
+
+  /** Convert cell-local coordinates to tile-local coordinates for spanning tiles. */
+  std::pair<uint16_t, uint16_t> span_local_(const Tile *t, uint8_t col, uint8_t row,
+                                             uint16_t local_x, uint16_t local_y) const {
+    const int cell_w = ctx_.tile_w();
+    const int cell_h = ctx_.tile_h();
+    return {
+      static_cast<uint16_t>((col - t->col()) * cell_w + local_x),
+      static_cast<uint16_t>((row - t->row()) * cell_h + local_y)
+    };
+  }
 
   void invalidate_all_() {
     for (auto &t : tiles_) t->invalidate_cache();

@@ -46,8 +46,12 @@ class TileDashboardE2ETests(unittest.TestCase):
 
         self.assertIn("tile_dashboard::TileDashboardComponent *dashboard_ui;", generated)
         self.assertIn("dashboard_ui->add_climate_tile", generated)
+        self.assertIn("dashboard_ui->add_gauge_tile", generated)
         self.assertIn("dashboard_ui->add_double_value_tile", generated)
+        self.assertIn("dashboard_ui->add_switch_tile", generated)
+        self.assertIn("dashboard_ui->add_battery_tile", generated)
         self.assertIn("dashboard_ui->set_display(dashboard_display);", generated)
+        self.assertIn("dashboard_ui->set_page_grid(0, 3, 3);", generated)
         self.assertIn("tile_dashboard:", stdout)
         self.assertNotIn("dashboard_font_bootstrap", stdout)
 

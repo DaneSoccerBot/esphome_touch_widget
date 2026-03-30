@@ -15,6 +15,7 @@ from components.tile_dashboard.config import (  # noqa: E402
     build_font_configs,
     component_base_id,
     font_id_name,
+    get_page_grid,
     raw_data_id_name,
     raw_glyph_id_name,
     tile_position,
@@ -47,13 +48,33 @@ class TileDashboardUnitTests(unittest.TestCase):
         tile = {"type": "switch", "col": 2, "row": 3}
         self.assertEqual(validate_tile_bounds(tile, 2, 3), (0, 2, 3))
 
+    def test_validate_tile_bounds_accepts_spanning_tile(self):
+        tile = {"type": "climate", "col": 1, "row": 1, "colspan": 2, "rowspan": 2}
+        self.assertEqual(validate_tile_bounds(tile, 3, 3), (0, 1, 1))
+
+    def test_validate_tile_bounds_rejects_span_exceeding_grid(self):
+        with self.assertRaisesRegex(ValueError, "exceeds grid 2x2"):
+            validate_tile_bounds(
+                {"type": "climate", "col": 1, "row": 1, "colspan": 3, "rowspan": 1}, 2, 2
+            )
+
     def test_validate_tile_bounds_rejects_out_of_grid_column(self):
-        with self.assertRaisesRegex(ValueError, "outside the configured grid 2x2"):
+        with self.assertRaisesRegex(ValueError, "exceeds grid 2x2"):
             validate_tile_bounds({"type": "switch", "col": 3, "row": 1}, 2, 2)
 
     def test_validate_tile_bounds_rejects_out_of_grid_row(self):
-        with self.assertRaisesRegex(ValueError, "outside the configured grid 2x2"):
+        with self.assertRaisesRegex(ValueError, "exceeds grid 2x2"):
             validate_tile_bounds({"type": "switch", "col": 1, "row": 3}, 2, 2)
+
+    def test_get_page_grid_returns_default(self):
+        config = {"cols": 2, "rows": 2}
+        self.assertEqual(get_page_grid(config, 0), (2, 2))
+        self.assertEqual(get_page_grid(config, 1), (2, 2))
+
+    def test_get_page_grid_returns_override(self):
+        config = {"cols": 2, "rows": 2, "page_configs": [{"page": 1, "cols": 3, "rows": 3}]}
+        self.assertEqual(get_page_grid(config, 0), (2, 2))
+        self.assertEqual(get_page_grid(config, 1), (3, 3))
 
     def test_validate_tiles_accepts_unique_positions(self):
         config = {
@@ -79,8 +100,35 @@ class TileDashboardUnitTests(unittest.TestCase):
         }
         self.assertIs(validate_tiles(config), config)
 
+    def test_validate_tiles_accepts_spanning_tile_with_normal(self):
+        config = {
+            "cols": 3,
+            "rows": 3,
+            "tiles": [
+                {"type": "climate", "col": 1, "row": 1, "colspan": 2, "rowspan": 2},
+                {"type": "switch", "col": 3, "row": 1},
+                {"type": "gauge", "col": 3, "row": 2},
+                {"type": "battery", "col": 1, "row": 3},
+                {"type": "text_value", "col": 2, "row": 3},
+            ],
+        }
+        self.assertIs(validate_tiles(config), config)
+
+    def test_validate_tiles_rejects_overlapping_span(self):
+        with self.assertRaisesRegex(ValueError, "Overlapping tiles"):
+            validate_tiles(
+                {
+                    "cols": 3,
+                    "rows": 3,
+                    "tiles": [
+                        {"type": "climate", "col": 1, "row": 1, "colspan": 2, "rowspan": 2},
+                        {"type": "switch", "col": 2, "row": 2},
+                    ],
+                }
+            )
+
     def test_validate_tiles_rejects_duplicate_positions(self):
-        with self.assertRaisesRegex(ValueError, "Duplicate tile position"):
+        with self.assertRaisesRegex(ValueError, "Overlapping tiles"):
             validate_tiles(
                 {
                     "cols": 2,
@@ -93,7 +141,7 @@ class TileDashboardUnitTests(unittest.TestCase):
             )
 
     def test_validate_tiles_rejects_out_of_grid(self):
-        with self.assertRaisesRegex(ValueError, "outside the configured grid"):
+        with self.assertRaisesRegex(ValueError, "exceeds grid"):
             validate_tiles(
                 {
                     "cols": 2,
@@ -101,6 +149,39 @@ class TileDashboardUnitTests(unittest.TestCase):
                     "tiles": [{"type": "switch", "col": 3, "row": 1}],
                 }
             )
+
+    def test_validate_tiles_uses_page_grid(self):
+        config = {
+            "cols": 2,
+            "rows": 2,
+            "page_configs": [{"page": 1, "cols": 3, "rows": 3}],
+            "tiles": [
+                {"type": "climate", "col": 1, "row": 1, "page": 0},
+                {"type": "switch", "col": 3, "row": 3, "page": 1},
+            ],
+        }
+        self.assertIs(validate_tiles(config), config)
+
+    def test_validate_tiles_rejects_tile_exceeding_page_grid(self):
+        with self.assertRaisesRegex(ValueError, "exceeds grid 2x2"):
+            validate_tiles(
+                {
+                    "cols": 2,
+                    "rows": 2,
+                    "tiles": [{"type": "switch", "col": 3, "row": 1, "page": 0}],
+                }
+            )
+
+    def test_validate_tiles_same_position_different_pages(self):
+        config = {
+            "cols": 2,
+            "rows": 2,
+            "tiles": [
+                {"type": "climate", "col": 1, "row": 1, "page": 0},
+                {"type": "switch", "col": 1, "row": 1, "page": 1},
+            ],
+        }
+        self.assertIs(validate_tiles(config), config)
 
     def test_font_id_name_uses_expected_convention(self):
         self.assertEqual(font_id_name("dashboard_ui", 45), "dashboard_ui_font_45")

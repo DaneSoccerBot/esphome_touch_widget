@@ -35,6 +35,9 @@ CONF_TOUCHSCREEN = "touchscreen"
 CONF_UNIT = "unit"
 CONF_FULLSCREEN = "fullscreen"
 CONF_PAGE = "page"
+CONF_COLSPAN = "colspan"
+CONF_ROWSPAN = "rowspan"
+CONF_PAGE_CONFIGS = "page_configs"
 CONF_YELLOW_THRESHOLD = "yellow_threshold"
 
 AUTO_INCLUDES = (
@@ -71,6 +74,8 @@ TILE_POSITION_SCHEMA = cv.Schema(
         cv.Required(CONF_ROW): cv.int_range(min=1),
         cv.Optional(CONF_FULLSCREEN, default=False): cv.boolean,
         cv.Optional(CONF_PAGE, default=0): cv.int_range(min=0),
+        cv.Optional(CONF_COLSPAN, default=1): cv.int_range(min=1),
+        cv.Optional(CONF_ROWSPAN, default=1): cv.int_range(min=1),
     }
 )
 
@@ -152,6 +157,14 @@ TILE_SCHEMA = cv.typed_schema(
     }
 )
 
+PAGE_CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.Required(CONF_PAGE): cv.int_range(min=0),
+        cv.Required(CONF_COLS): cv.int_range(min=1),
+        cv.Required(CONF_ROWS): cv.int_range(min=1),
+    }
+)
+
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
@@ -167,6 +180,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_TOUCH_ROTATION, default=0): cv.one_of(0, 90, 180, 270, int=True),
             cv.Optional(CONF_FONT_FILE, default="gfonts://Roboto Condensed"): font.font_file_schema,
             cv.Optional(CONF_GLYPHS, default=DEFAULT_GLYPHS): cv.ensure_list(cv.string_strict),
+            cv.Optional(CONF_PAGE_CONFIGS, default=[]): cv.ensure_list(PAGE_CONFIG_SCHEMA),
             cv.Required(CONF_TILES): cv.All(cv.ensure_list(TILE_SCHEMA), cv.Length(min=1)),
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -212,6 +226,13 @@ async def to_code(config):
     )
     cg.add(var.set_touch_rotation(config[CONF_TOUCH_ROTATION]))
 
+    for page_config in config[CONF_PAGE_CONFIGS]:
+        cg.add(var.set_page_grid(
+            page_config[CONF_PAGE],
+            page_config[CONF_COLS],
+            page_config[CONF_ROWS],
+        ))
+
     fonts = await _generate_fonts(config)
     cg.add(var.set_roboto_fonts(*fonts))
 
@@ -227,6 +248,8 @@ async def to_code(config):
                     sensor_var,
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "text_value":
@@ -241,6 +264,8 @@ async def to_code(config):
                     sensor_var,
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "double_value":
@@ -260,6 +285,8 @@ async def to_code(config):
                     bottom_sensor,
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "gauge":
@@ -278,6 +305,8 @@ async def to_code(config):
                     tile[CONF_FORMAT],
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "climate":
@@ -291,6 +320,8 @@ async def to_code(config):
                     tile[CONF_ENTITY_ID],
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "switch":
@@ -304,6 +335,8 @@ async def to_code(config):
                     tile[CONF_ENTITY_ID],
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )
         elif tile_type == "light":
@@ -317,5 +350,7 @@ async def to_code(config):
                     tile[CONF_ENTITY_ID],
                     tile[CONF_FULLSCREEN],
                     tile[CONF_PAGE],
+                    tile[CONF_COLSPAN],
+                    tile[CONF_ROWSPAN],
                 )
             )

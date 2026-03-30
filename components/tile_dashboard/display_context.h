@@ -154,7 +154,28 @@ struct DisplayContext
         font_gauge_value = get_font_for_size(size_gauge_value);
 
         // Cache für alle Tiles zurücksetzen
-        cache_value.assign(cols * rows, "");
+        cache_value.clear();
+    }
+
+    /**
+     *  Leichtgewichtige Grid-Umschaltung für per-Page Layouts.
+     *  Ändert nur cols/rows und die davon abgeleiteten Font-Pointer,
+     *  lässt scr_w/scr_h/x0/y0 und den Cache unangetastet.
+     */
+    void apply_page_grid(int grid_cols, int grid_rows)
+    {
+        grid_cols = std::max(grid_cols, 1);
+        grid_rows = std::max(grid_rows, 1);
+        if (cols == grid_cols && rows == grid_rows)
+            return;
+        cols = grid_cols;
+        rows = grid_rows;
+        const float size_value_compact = (scr_h / rows) * 0.30f;
+        const float size_label_compact = (scr_h / rows) * 0.1f;
+        const float size_gauge_value   = (scr_h / rows) * 0.25f;
+        font_value_compact = get_font_for_size(size_value_compact);
+        font_label_compact = get_font_for_size(size_label_compact);
+        font_gauge_value   = get_font_for_size(size_gauge_value);
     }
 };
 

@@ -139,9 +139,14 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     this->offset_y_ = offset_y;
     this->context_ready_ = false;
     this->screen_initialized_ = false;
+    this->dashboard_.set_default_grid(this->cols_, this->rows_);
   }
 
   void set_touch_rotation(uint16_t rotation) { this->touch_rotation_ = rotation; }
+
+  void set_page_grid(uint8_t page, uint8_t cols, uint8_t rows) {
+    this->dashboard_.set_page_grid(page, cols, rows);
+  }
 
   void set_roboto_fonts(Font *f12, Font *f14, Font *f16, Font *f18,
                         Font *f20, Font *f25, Font *f30, Font *f35,
@@ -153,22 +158,26 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
 
   void add_battery_tile(uint8_t col, uint8_t row, std::string label,
                         sensor::Sensor *sensor, bool fullscreen = false,
-                        uint8_t page = 0) {
+                        uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<BatteryTile>(
         this->ctx_, col, row, std::move(label), BatteryTile::Cfg{sensor});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_text_value_tile(uint8_t col, uint8_t row, std::string label,
                            std::string unit, std::string fmt,
                            sensor::Sensor *sensor, bool fullscreen = false,
-                           uint8_t page = 0) {
+                           uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<TextValueTile>(
         this->ctx_, col, row, std::move(label), std::move(unit),
         std::move(fmt), TextValueTile::Cfg{sensor});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_double_value_tile(uint8_t col, uint8_t row,
@@ -177,20 +186,22 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
                              std::string fmt_top, std::string fmt_bottom,
                              sensor::Sensor *top_sensor,
                              sensor::Sensor *bottom_sensor, bool fullscreen = false,
-                             uint8_t page = 0) {
+                             uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<DoubleValueTile>(
         this->ctx_, col, row, std::move(top_label), std::move(bottom_label),
         std::move(top_unit), std::move(bottom_unit), std::move(fmt_top),
         std::move(fmt_bottom), DoubleValueTile::Cfg{top_sensor, bottom_sensor});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_gauge_tile(uint8_t col, uint8_t row, std::string label,
                       sensor::Sensor *sensor, float min_value, float max_value,
                       float red_threshold, float yellow_threshold,
                       std::string unit, std::string fmt, bool fullscreen = false,
-                      uint8_t page = 0) {
+                      uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<GaugeTile>(
         this->ctx_, col, row, std::move(label),
         GaugeTile::Cfg{
@@ -203,37 +214,45 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
         });
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_climate_tile(uint8_t col, uint8_t row, std::string label,
                         text_sensor::TextSensor *payload,
                         std::string entity_id, bool fullscreen = false,
-                        uint8_t page = 0) {
+                        uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<ClimateTile>(
         this->ctx_, col, row, std::move(label),
         ClimateTile::Cfg{payload, std::move(entity_id)});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_switch_tile(uint8_t col, uint8_t row, std::string label,
                        switch_::Switch *sw, std::string entity_id, bool fullscreen = false,
-                       uint8_t page = 0) {
+                       uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<SwitchTile>(
         this->ctx_, col, row, std::move(label),
         SwitchTile::Cfg{sw, std::move(entity_id)});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
   void add_light_tile(uint8_t col, uint8_t row, std::string label,
                       text_sensor::TextSensor *state, std::string entity_id, bool fullscreen = false,
-                      uint8_t page = 0) {
+                      uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
     auto &t = this->dashboard_.add_tile<LightTile>(
         this->ctx_, col, row, std::move(label),
         LightTile::Cfg{state, std::move(entity_id)});
     t.set_fullscreen_enabled(fullscreen);
     t.set_page(page);
+    t.set_colspan(colspan);
+    t.set_rowspan(rowspan);
   }
 
  protected:
@@ -267,8 +286,6 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     if (this->context_ready_ &&
         this->ctx_.scr_w == resolved_width &&
         this->ctx_.scr_h == resolved_height &&
-        this->ctx_.cols == this->cols_ &&
-        this->ctx_.rows == this->rows_ &&
         this->ctx_.x0 == this->offset_x_ &&
         this->ctx_.y0 == this->offset_y_) {
       return;
@@ -283,10 +300,11 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
 
   TouchMapping map_touch_(int x, int y) {
     this->configure_context_();
+    const auto [c, r] = this->dashboard_.page_grid(this->dashboard_.active_page());
     const int width = this->ctx_.scr_w > 0 ? this->ctx_.scr_w : 1;
     const int height = this->ctx_.scr_h > 0 ? this->ctx_.scr_h : 1;
     return map_touch(
-        x, y, width, height, this->cols_, this->rows_, this->touch_rotation_,
+        x, y, width, height, c, r, this->touch_rotation_,
         this->offset_x_, this->offset_y_);
   }
 

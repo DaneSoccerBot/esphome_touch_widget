@@ -19,29 +19,50 @@ def tile_position(tile):
     return tile.get("page", 0), tile["col"], tile["row"]
 
 
+def get_page_grid(config, page):
+    """Return (cols, rows) for a given page number."""
+    for pc in config.get("page_configs", []):
+        if pc["page"] == page:
+            return pc["cols"], pc["rows"]
+    return config["cols"], config["rows"]
+
+
 def validate_tile_bounds(tile, cols, rows):
     pos = tile_position(tile)
-    if tile["col"] > cols or tile["row"] > rows:
+    colspan = tile.get("colspan", 1)
+    rowspan = tile.get("rowspan", 1)
+    if tile["col"] + colspan - 1 > cols or tile["row"] + rowspan - 1 > rows:
         raise ValueError(
             f"Tile {tile['type']} at col={tile['col']}, row={tile['row']} "
-            f"is outside the configured grid {cols}x{rows}"
+            f"(span {colspan}x{rowspan}) exceeds grid {cols}x{rows}"
         )
     return pos
 
 
 def validate_tiles(config):
-    positions = set()
-    cols = config["cols"]
-    rows = config["rows"]
-
+    occupied = {}
     for tile in config["tiles"]:
-        pos = validate_tile_bounds(tile, cols, rows)
-        if pos in positions:
+        page = tile.get("page", 0)
+        cols, rows = get_page_grid(config, page)
+        colspan = tile.get("colspan", 1)
+        rowspan = tile.get("rowspan", 1)
+        col = tile["col"]
+        row = tile["row"]
+
+        if col + colspan - 1 > cols or row + rowspan - 1 > rows:
             raise ValueError(
-                f"Duplicate tile position detected at "
-                f"page={pos[0]}, col={pos[1]}, row={pos[2]}"
+                f"Tile {tile['type']} at col={col}, row={row} "
+                f"(span {colspan}x{rowspan}) exceeds grid {cols}x{rows}"
             )
-        positions.add(pos)
+
+        for c in range(col, col + colspan):
+            for r in range(row, row + rowspan):
+                cell = (page, c, r)
+                if cell in occupied:
+                    raise ValueError(
+                        f"Overlapping tiles at page={page}, col={c}, row={r}"
+                    )
+                occupied[cell] = tile
 
     return config
 

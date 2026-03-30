@@ -214,7 +214,7 @@ class TileDashboardSchemaTests(unittest.TestCase):
         self.assertEqual(validated["tiles"][0]["entity_id"], "light.demo_light")
 
     def test_schema_rejects_duplicate_positions(self):
-        with self.assertRaisesRegex(Exception, "Duplicate tile position"):
+        with self.assertRaisesRegex(Exception, "Overlapping tiles"):
             CONFIG_SCHEMA(
                 self.base_config(
                     [
@@ -239,7 +239,7 @@ class TileDashboardSchemaTests(unittest.TestCase):
             )
 
     def test_schema_rejects_tile_outside_grid(self):
-        with self.assertRaisesRegex(Exception, "outside the configured grid"):
+        with self.assertRaisesRegex(Exception, "exceeds grid"):
             CONFIG_SCHEMA(
                 self.base_config(
                     [
