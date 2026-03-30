@@ -4,7 +4,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ESPHOME_BIN = ROOT / ".venv/bin/esphome"
+ESPHOME_BIN = ROOT / ".venv" / ("Scripts" if os.name == "nt" else "bin") / (
+    "esphome.exe" if os.name == "nt" else "esphome"
+)
 
 
 class TileDashboardE2ETests(unittest.TestCase):

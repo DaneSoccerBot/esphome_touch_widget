@@ -118,24 +118,60 @@ Wichtig: ESPHome erzeugt im Dashboard weiterhin eine lokale Geräte-YAML. Das is
 
 ## Entwicklung
 
+### Setup
+
+Nach dem Clone ist der empfohlene Einstieg genau ein Kommando:
+
+macOS / Linux:
+
+```bash
+./scripts/bootstrap.sh
+```
+
+Windows:
+
+```powershell
+.\scripts\bootstrap.ps1
+```
+
+Das erzeugt eine lokale `.venv`, installiert das gepinnte ESPHome-Tooling aus
+[`requirements-dev.txt`](requirements-dev.txt) und prüft den Host-Simulator.
+
+Die Bootstrap-Skripte rufen intern weiterhin [`scripts/dev.py`](scripts/dev.py)
+auf. Wenn du den Python-Weg direkt nutzen willst, geht das ebenfalls:
+
+- macOS / Linux: `python3 scripts/dev.py setup`
+- Windows: `py -3 scripts/dev.py setup`
+
+Für den lokalen Simulator braucht das Repo zusätzlich Systempakete:
+
+- macOS: `brew install sdl2 pkg-config`
+- Ubuntu/Debian: `sudo apt install libsdl2-dev pkg-config`
+- Fedora: `sudo dnf install SDL2-devel pkgconf-pkg-config`
+- Arch: `sudo pacman -S sdl2 pkgconf`
+- Windows: am einfachsten über WSL2 + WSLg; native Host-Builds brauchen SDL2, `pkg-config` und Visual-Studio-C++-Build-Tools
+
+Der neue Dev-Entrypoint kapselt danach alle üblichen Kommandos ohne manuelles
+Aktivieren der venv.
+
 ### Simulator
 
 Schnelle UI-Iteration:
 
 ```bash
-.venv/bin/esphome run examples/simulator_ha_2x2.yaml
+python3 scripts/dev.py run-sim-2x2
 ```
 
 Alle Tile-Typen im Simulator:
 
 ```bash
-.venv/bin/esphome run examples/simulator_all_tiles.yaml
+python3 scripts/dev.py run-sim-all
 ```
 
 Größeres 3x3-Showcase im Simulator:
 
 ```bash
-.venv/bin/esphome run examples/simulator_showcase_3x3.yaml
+python3 scripts/dev.py run-sim-3x3
 ```
 
 ### ESP32
@@ -143,13 +179,13 @@ Größeres 3x3-Showcase im Simulator:
 Hardware-Build:
 
 ```bash
-.venv/bin/esphome compile examples/display48norelay.refactored.yaml
+python3 scripts/dev.py compile-esp32
 ```
 
 Import-Package-Pfad lokal prüfen:
 
 ```bash
-.venv/bin/esphome compile examples/display48norelay.package_import.yaml
+python3 scripts/dev.py config
 ```
 
 ## Tests
@@ -163,16 +199,17 @@ Die Tests liegen unter `tests/` und decken drei Ebenen ab:
 Schnelllauf:
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v
+python3 scripts/dev.py test
 ```
 
 Dev-Helper:
 
 ```bash
-.venv/bin/python scripts/test_dashboard.py unit
-.venv/bin/python scripts/test_dashboard.py config
-.venv/bin/python scripts/test_dashboard.py compile-sim
-.venv/bin/python scripts/test_dashboard.py compile-esp32
+python3 scripts/dev.py doctor
+python3 scripts/dev.py unit
+python3 scripts/dev.py config
+python3 scripts/dev.py compile-sim
+python3 scripts/dev.py compile-esp32
 ```
 
 Standardmäßig geprüft werden:
