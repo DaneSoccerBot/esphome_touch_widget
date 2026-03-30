@@ -84,15 +84,37 @@ class TileDashboardE2ETests(unittest.TestCase):
         self.assertIn("dashboard_ui->add_light_tile", generated)
         self.assertIn("tile_dashboard:", stdout)
 
+    def test_showcase_3x3_generates_full_feature_grid(self):
+        stdout, generated = self.config_and_main_cpp(
+            "examples/simulator_showcase_3x3.yaml", "dashboard-3x3-showcase"
+        )
+
+        self.assertIn("dashboard_ui->set_layout(720, 720, 3, 3, 0, 0);", generated)
+        self.assertIn("dashboard_ui->add_battery_tile", generated)
+        self.assertIn("dashboard_ui->add_text_value_tile", generated)
+        self.assertIn("dashboard_ui->add_double_value_tile", generated)
+        self.assertIn("dashboard_ui->add_gauge_tile", generated)
+        self.assertIn("dashboard_ui->add_climate_tile", generated)
+        self.assertIn("dashboard_ui->add_switch_tile", generated)
+        self.assertIn("dashboard_ui->add_light_tile", generated)
+        self.assertIn("tile_dashboard:", stdout)
+
     def test_simulator_all_tiles_config_keeps_flexible_grid(self):
         stdout = self.config_output("examples/simulator_all_tiles.yaml")
         self.assertIn("cols: 4", stdout)
         self.assertIn("rows: 2", stdout)
         self.assertIn("dashboard_width: '800'", stdout)
 
+    def test_showcase_3x3_config_keeps_flexible_grid(self):
+        stdout = self.config_output("examples/simulator_showcase_3x3.yaml")
+        self.assertIn("cols: 3", stdout)
+        self.assertIn("rows: 3", stdout)
+        self.assertIn("dashboard_width: '720'", stdout)
+
     def test_thin_examples_validate_without_profiles(self):
         for config_path in (
             "examples/simulator_ha_2x2.yaml",
+            "examples/simulator_showcase_3x3.yaml",
             "examples/simulator_all_tiles.yaml",
             "examples/display48norelay.refactored.yaml",
             "examples/display48norelay.package_import.yaml",
@@ -104,6 +126,11 @@ class TileDashboardE2ETests(unittest.TestCase):
         if os.environ.get("ESPHOME_RUN_SIM_COMPILE") != "1":
             self.skipTest("enable with ESPHOME_RUN_SIM_COMPILE=1")
         self.run_esphome("compile", "examples/simulator_ha_2x2.yaml")
+
+    def test_simulator_showcase_compile_succeeds(self):
+        if os.environ.get("ESPHOME_RUN_SIM_COMPILE") != "1":
+            self.skipTest("enable with ESPHOME_RUN_SIM_COMPILE=1")
+        self.run_esphome("compile", "examples/simulator_showcase_3x3.yaml")
 
     def test_simulator_all_tiles_compile_succeeds(self):
         if os.environ.get("ESPHOME_RUN_SIM_COMPILE") != "1":

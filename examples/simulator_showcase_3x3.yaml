@@ -1,0 +1,211 @@
+substitutions:
+  device_name: dashboard-3x3-showcase
+  friendly_name: Dashboard 3x3 Showcase
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: DEBUG
+  dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
+  tile_dashboard_components_source: ../components
+  touch_rotation: "0"
+  dashboard_width: "720"
+  dashboard_height: "720"
+
+packages:
+  device: !include ../packages/device/simulator_device_base.yaml
+
+globals:
+  - id: sim_tick
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          id(sim_tick)++;
+
+sensor:
+  - platform: template
+    id: battery_percent
+    name: "${friendly_name} Battery"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 18;
+      const float ramp = phase <= 9 ? phase : 18 - phase;
+      return 28.0f + ramp * 6.5f;
+
+  - platform: template
+    id: room_temperature
+    name: "${friendly_name} Room Temperature"
+    accuracy_decimals: 1
+    update_interval: 1s
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 14;
+      const float ramp = phase <= 7 ? phase : 14 - phase;
+      return 19.5f + ramp * 0.45f;
+
+  - platform: template
+    id: energy_price
+    name: "${friendly_name} Energy Price"
+    accuracy_decimals: 2
+    update_interval: 1s
+    lambda: |-
+      const uint32_t step = id(sim_tick) % 15;
+      return 0.14f + 0.01f * step;
+
+  - platform: template
+    id: solar_power
+    name: "${friendly_name} Solar Power"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 20;
+      const float ramp = phase <= 10 ? phase : 20 - phase;
+      return 120.0f + ramp * 85.0f;
+
+  - platform: template
+    id: grid_load
+    name: "${friendly_name} Grid Load"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      const uint32_t phase = (id(sim_tick) + 5) % 16;
+      const float ramp = phase <= 8 ? phase : 16 - phase;
+      return 180.0f + ramp * 70.0f;
+
+text_sensor:
+  - platform: template
+    id: climate_zone_a_payload
+    name: "${friendly_name} Zone A Climate"
+    update_interval: 1s
+    lambda: |-
+      const float target = 20.0f + 0.5f * float(id(sim_tick) % 8);
+      const float current = 19.0f + 0.4f * float((id(sim_tick) + 2) % 8);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: climate_zone_b_payload
+    name: "${friendly_name} Zone B Climate"
+    update_interval: 1s
+    lambda: |-
+      const float target = 18.5f + 0.5f * float((id(sim_tick) + 3) % 6);
+      const float current = 18.0f + 0.3f * float((id(sim_tick) + 1) % 6);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"auto\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: demo_light_state
+    name: "${friendly_name} Light State"
+    update_interval: 1s
+    lambda: |-
+      return (id(sim_tick) / 3) % 2 == 0 ? std::string("on") : std::string("off");
+
+switch:
+  - platform: template
+    id: demo_switch
+    name: "${friendly_name} Demo Switch"
+    optimistic: true
+
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 3
+  rows: 3
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: ${dashboard_font_file}
+  tiles:
+    - type: battery
+      col: 1
+      row: 1
+      label: BATTERY
+      sensor: battery_percent
+
+    - type: text_value
+      col: 2
+      row: 1
+      label: ROOM TEMP
+      sensor: room_temperature
+      unit: "°C"
+      format: "%.1f"
+
+    - type: double_value
+      col: 3
+      row: 1
+      top_label: PRICE
+      bottom_label: LOAD
+      top_sensor: energy_price
+      bottom_sensor: grid_load
+      top_unit: "€"
+      bottom_unit: "W"
+      top_format: "%.2f"
+      bottom_format: "%.0f"
+
+    - type: gauge
+      col: 1
+      row: 2
+      label: SOLAR
+      sensor: solar_power
+      min_value: 0
+      max_value: 1000
+      red_threshold: 250
+      yellow_threshold: 600
+      unit: "W"
+      format: "%.0f"
+
+    - type: gauge
+      col: 2
+      row: 2
+      label: GRID
+      sensor: grid_load
+      min_value: 0
+      max_value: 900
+      red_threshold: 250
+      yellow_threshold: 550
+      unit: "W"
+      format: "%.0f"
+
+    - type: climate
+      col: 3
+      row: 2
+      label: ZONE A
+      payload: climate_zone_a_payload
+      entity_id: climate.demo_zone_a
+
+    - type: switch
+      col: 1
+      row: 3
+      label: SWITCH
+      switch: demo_switch
+      entity_id: switch.demo_switch
+
+    - type: light
+      col: 2
+      row: 3
+      label: LIGHT
+      state: demo_light_state
+      entity_id: light.demo_light
+
+    - type: climate
+      col: 3
+      row: 3
+      label: ZONE B
+      payload: climate_zone_b_payload
+      entity_id: climate.demo_zone_b

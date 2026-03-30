@@ -92,6 +92,8 @@ Die Geräte-YAML enthält keine Display- oder Touch-Lambdas mehr. Die Komponente
   Dünne lokale Geräte-YAML über das Import-Package.
 - [`examples/simulator_ha_2x2.yaml`](examples/simulator_ha_2x2.yaml)
   Dünne lokale Simulator-YAML.
+- [`examples/simulator_showcase_3x3.yaml`](examples/simulator_showcase_3x3.yaml)
+  Größeres 3x3-Simulatorbeispiel mit mehr Tile-Typen und animierten Demo-Daten.
 - [`examples/simulator_all_tiles.yaml`](examples/simulator_all_tiles.yaml)
   Simulator-Beispiel, das alle Tile-Typen abdeckt.
 
@@ -128,6 +130,12 @@ Alle Tile-Typen im Simulator:
 
 ```bash
 .venv/bin/esphome run examples/simulator_all_tiles.yaml
+```
+
+Größeres 3x3-Showcase im Simulator:
+
+```bash
+.venv/bin/esphome run examples/simulator_showcase_3x3.yaml
 ```
 
 ### ESP32

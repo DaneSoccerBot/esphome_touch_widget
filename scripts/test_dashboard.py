@@ -29,12 +29,14 @@ def main():
 
     if args.target in ("config", "all"):
         run([str(ESPHOME_BIN), "config", "examples/simulator_ha_2x2.yaml"])
+        run([str(ESPHOME_BIN), "config", "examples/simulator_showcase_3x3.yaml"])
         run([str(ESPHOME_BIN), "config", "examples/simulator_all_tiles.yaml"])
         run([str(ESPHOME_BIN), "config", "examples/display48norelay.refactored.yaml"])
         run([str(ESPHOME_BIN), "config", "examples/display48norelay.package_import.yaml"])
 
     if args.target in ("compile-sim", "all"):
         run([str(ESPHOME_BIN), "compile", "examples/simulator_ha_2x2.yaml"])
+        run([str(ESPHOME_BIN), "compile", "examples/simulator_showcase_3x3.yaml"])
         run([str(ESPHOME_BIN), "compile", "examples/simulator_all_tiles.yaml"])
 
     if args.target in ("compile-esp32", "all"):
