@@ -1,58 +1,73 @@
 # esphome_touch_widget
 
-Dieses Repo ist jetzt auf `thin device configs` ausgerichtet:
+`esphome_touch_widget` is an extensible touch UI framework for ESPHome. It is
+designed to turn inexpensive, low-power ESP32 touch displays into Home
+Assistant control panels, with fast iteration in a local simulator and on real
+hardware.
 
-- Das Repo liefert die wiederverwendbare Dashboard-Komponente.
-- Das Repo liefert Hardware-/Basis-Packages.
-- Jede Installation behält genau eine lokale Geräte-YAML.
-- Grid, Tiles und Home-Assistant-Entity-Mapping bleiben lokal und flexibel.
+The long-term direction is broader than a simple tile dashboard. The current
+focus is reusable tiles, declarative layout, and simulator-first development,
+but the project is intended to grow toward richer UI widgets, paging, full
+screen focus views, and more advanced control workflows for power-sensitive
+environments such as camper vans, cabins, and remote solar-backed buildings.
 
-Der primäre Schnitt ist damit:
+## Architecture
+
+The repository is structured around `thin device configs`:
+
+- The repo provides the reusable dashboard component.
+- The repo provides hardware and base packages.
+- Each installation keeps one local device YAML.
+- Grid layout, tile selection, and Home Assistant entity mapping remain local
+  and flexible.
+
+The primary split is:
 
 - `components/tile_dashboard`
-  Die deklarative ESPHome-Komponente mit `tile_dashboard:`.
+  Declarative ESPHome component exposed as `tile_dashboard:`.
 - `packages/base`
-  Gemeinsame Geräte- und Host-Basen.
+  Shared device and host base packages.
 - `packages/hardware`
-  Board-, Display- und Touch-Definitionen.
+  Board, display, and touchscreen definitions.
 - `packages/device`
-  Dünne Kombinatoren aus Base, Hardware und `external_components`.
+  Thin package combinators that wire together base, hardware, and
+  `external_components`.
 - `packages/import`
-  Remote-Packages für `github://...`-Einbindung.
+  Remote packages intended for `github://...` imports.
 - `examples`
-  Vollständige lokale Geräte-YAMLs als Referenz.
+  Complete reference YAML files for simulator and hardware usage.
 
-## Zielbild
+## Intended Usage
 
-Ein Nutzer legt in ESPHome genau eine lokale Geräte-YAML an. Diese YAML:
+The target user flow is one local ESPHome YAML per device. That YAML:
 
-- importiert die generischen Repo-Pakete
-- definiert ihre eigenen Sensoren und Text-Sensoren
-- definiert ihr eigenes `tile_dashboard:` mit beliebigem Grid
+- imports the generic packages from this repository
+- defines its own sensors and text sensors
+- defines its own `tile_dashboard:` grid and tile layout
 
-Ein minimales Muster sieht so aus:
+A minimal pattern looks like this:
 
 ```yaml
 substitutions:
-  device_name: wohnzimmer-display
-  friendly_name: Wohnzimmer Display
+  device_name: living-room-display
+  friendly_name: Living Room Display
   wifi_ssid: YOUR_WIFI_SSID
   wifi_password: YOUR_WIFI_PASSWORD
   api_encryption_key: YOUR_API_KEY
   ota_password: YOUR_OTA_PASSWORD
   dashboard_font_file: gfonts://Roboto Condensed
-  tile_dashboard_components_source: github://OWNER/esphome_touch_widget/components@v0.1.0
+  tile_dashboard_components_source: github://DaneSoccerBot/esphome_touch_widget/components@main
   dashboard_width: "480"
   dashboard_height: "480"
   touch_rotation: "0"
 
 packages:
-  device: github://OWNER/esphome_touch_widget/packages/import/display48_device_base.yaml@v0.1.0
+  device: github://DaneSoccerBot/esphome_touch_widget/packages/import/display48_device_base.yaml@main
 
 sensor:
   - platform: homeassistant
     id: battery_percent
-    entity_id: sensor.victron_system_battery_soc
+    entity_id: sensor.demo_battery_percent
 
 tile_dashboard:
   display: dashboard_display
@@ -70,57 +85,59 @@ tile_dashboard:
       sensor: battery_percent
 ```
 
-Die Geräte-YAML enthält keine Display- oder Touch-Lambdas mehr. Die Komponente hängt sich selbst an Display und Touchscreen.
+Device YAML files no longer need display or touchscreen lambdas. The component
+attaches itself to the configured display and touchscreen.
 
-## Wichtigste Dateien
+## Key Files
 
 - [`components/tile_dashboard/__init__.py`](components/tile_dashboard/__init__.py)
-  ESPHome-Schema und Codegen.
+  ESPHome schema and code generation.
 - [`components/tile_dashboard/config.py`](components/tile_dashboard/config.py)
-  Testbare Helper für Tile- und Font-Konfiguration.
+  Testable helpers for tile and font configuration.
 - [`components/tile_dashboard/tile_dashboard_component.h`](components/tile_dashboard/tile_dashboard_component.h)
-  Runtime für Rendering, Touch-Routing und Tile-Erzeugung.
+  Runtime for rendering, touch routing, and tile instantiation.
 - [`packages/device/display48_device_base.yaml`](packages/device/display48_device_base.yaml)
-  Dünne Basis für das echte 480x480-ESP32-Display.
+  Thin base package for the physical 480x480 ESP32 display target.
 - [`packages/device/simulator_device_base.yaml`](packages/device/simulator_device_base.yaml)
-  Dünne Basis für den Host/SDL-Simulator.
+  Thin base package for the host/SDL simulator.
 - [`packages/import/display48_device_base.yaml`](packages/import/display48_device_base.yaml)
-  Remote-Package für echte Geräte.
+  Remote package for physical device imports.
 - [`examples/display48norelay.refactored.yaml`](examples/display48norelay.refactored.yaml)
-  Dünne lokale ESP32-Geräte-YAML.
+  Thin local ESP32 device example.
 - [`examples/display48norelay.package_import.yaml`](examples/display48norelay.package_import.yaml)
-  Dünne lokale Geräte-YAML über das Import-Package.
+  Thin local device example built through the import package.
 - [`examples/simulator_ha_2x2.yaml`](examples/simulator_ha_2x2.yaml)
-  Dünne lokale Simulator-YAML.
+  Compact 2x2 simulator example.
 - [`examples/simulator_showcase_3x3.yaml`](examples/simulator_showcase_3x3.yaml)
-  Größeres 3x3-Simulatorbeispiel mit mehr Tile-Typen und animierten Demo-Daten.
+  Larger 3x3 simulator showcase with more tile types and animated demo data.
 - [`examples/simulator_all_tiles.yaml`](examples/simulator_all_tiles.yaml)
-  Simulator-Beispiel, das alle Tile-Typen abdeckt.
+  Simulator example that exercises every currently supported tile type.
 
-## Repo-Einbindung
+## GitHub Import Path
 
-Für reale Nutzer ist der empfohlene Pfad:
+For public ESPHome users, the recommended starting point is:
 
 ```yaml
 packages:
-  device: github://OWNER/esphome_touch_widget/packages/import/display48_device_base.yaml@v0.1.0
+  device: github://DaneSoccerBot/esphome_touch_widget/packages/import/display48_device_base.yaml@main
 ```
 
-Danach bleibt alles Flexible lokal:
+After that, all flexible parts stay local:
 
-- `sensor:`, `text_sensor:`, `switch:`
+- `sensor:`, `text_sensor:`, and `switch:`
 - `tile_dashboard:`
-- Grid-Größe
-- Tile-Anordnung
-- Entity-Mapping
+- grid dimensions
+- tile placement
+- Home Assistant entity mapping
 
-Wichtig: ESPHome erzeugt im Dashboard weiterhin eine lokale Geräte-YAML. Das ist hier gewollt, weil genau dort die gerätespezifische Belegung lebt.
+ESPHome will still generate one local device YAML in the dashboard. That is
+intentional here, because the device-specific configuration belongs there.
 
-## Entwicklung
+## Local Development
 
-### Setup
+### Bootstrap
 
-Nach dem Clone ist der empfohlene Einstieg genau ein Kommando:
+After cloning the repository, the recommended entry point is a single command.
 
 macOS / Linux:
 
@@ -134,55 +151,57 @@ Windows:
 .\scripts\bootstrap.ps1
 ```
 
-Das erzeugt eine lokale `.venv`, installiert das gepinnte ESPHome-Tooling aus
-[`requirements-dev.txt`](requirements-dev.txt) und prüft den Host-Simulator.
+This creates a local `.venv`, installs the pinned ESPHome tooling from
+[`requirements-dev.txt`](requirements-dev.txt), and checks whether the host
+simulator environment is ready.
 
-Die Bootstrap-Skripte rufen intern weiterhin [`scripts/dev.py`](scripts/dev.py)
-auf. Wenn du den Python-Weg direkt nutzen willst, geht das ebenfalls:
+The bootstrap scripts call [`scripts/dev.py`](scripts/dev.py) internally. You
+can also use the Python entry point directly:
 
 - macOS / Linux: `python3 scripts/dev.py setup`
 - Windows: `py -3 scripts/dev.py setup`
 
-Für den lokalen Simulator braucht das Repo zusätzlich Systempakete:
+For the local simulator you still need system packages:
 
 - macOS: `brew install sdl2 pkg-config`
-- Ubuntu/Debian: `sudo apt install libsdl2-dev pkg-config`
+- Ubuntu / Debian: `sudo apt install libsdl2-dev pkg-config`
 - Fedora: `sudo dnf install SDL2-devel pkgconf-pkg-config`
 - Arch: `sudo pacman -S sdl2 pkgconf`
-- Windows: am einfachsten über WSL2 + WSLg; native Host-Builds brauchen SDL2, `pkg-config` und Visual-Studio-C++-Build-Tools
+- Windows: the easiest path is WSL2 + WSLg; native host builds need SDL2,
+  `pkg-config`, and Visual Studio C++ build tools
 
-Der neue Dev-Entrypoint kapselt danach alle üblichen Kommandos ohne manuelles
-Aktivieren der venv.
+The new dev entry point wraps the common tasks without requiring manual
+activation of the virtual environment.
 
 ### Simulator
 
-Schnelle UI-Iteration:
+Quick iteration in the compact simulator:
 
 ```bash
 python3 scripts/dev.py run-sim-2x2
 ```
 
-Alle Tile-Typen im Simulator:
-
-```bash
-python3 scripts/dev.py run-sim-all
-```
-
-Größeres 3x3-Showcase im Simulator:
+Run the larger 3x3 showcase:
 
 ```bash
 python3 scripts/dev.py run-sim-3x3
 ```
 
+Run the full tile coverage simulator:
+
+```bash
+python3 scripts/dev.py run-sim-all
+```
+
 ### ESP32
 
-Hardware-Build:
+Validate and compile the hardware examples:
 
 ```bash
 python3 scripts/dev.py compile-esp32
 ```
 
-Import-Package-Pfad lokal prüfen:
+Validate all tracked example configs:
 
 ```bash
 python3 scripts/dev.py config
@@ -190,19 +209,20 @@ python3 scripts/dev.py config
 
 ## Tests
 
-Die Tests liegen unter `tests/` und decken drei Ebenen ab:
+The test suite covers three layers:
 
-- Helper-Unit-Tests für Tile- und Font-Logik
-- Schema-Tests für `tile_dashboard:`
-- e2e-Tests für dünne Geräte-YAMLs, Import-Packages und Simulator-Codegen
+- unit tests for tile and font helper logic
+- schema tests for `tile_dashboard:`
+- end-to-end checks for thin device YAMLs, import packages, and simulator code
+  generation
 
-Schnelllauf:
+Quick test run:
 
 ```bash
 python3 scripts/dev.py test
 ```
 
-Dev-Helper:
+Additional development commands:
 
 ```bash
 python3 scripts/dev.py doctor
@@ -212,42 +232,49 @@ python3 scripts/dev.py compile-sim
 python3 scripts/dev.py compile-esp32
 ```
 
-Standardmäßig geprüft werden:
+By default, the repo validates:
 
-- dünne ESP32- und Simulator-Geräte-YAMLs
-- das generische Import-Package
-- alle Tile-Typen im Simulator
-- generierter C++-Code per `esphome compile --only-generate` im Host-Pfad
+- thin ESP32 and simulator device YAMLs
+- the generic import package
+- all supported tile types in simulator examples
+- generated C++ output through `esphome compile --only-generate` on the host path
 
-Die vollen Compile-Tests bleiben separat über die vorhandenen `compile-*`-Targets.
+The full compile checks remain separate under the explicit compile commands.
 
-## ESPHome 2025.3.3 Hinweise
+## ESPHome 2025.3.3 Notes
 
-Mit lokalem ESPHome `2025.3.3` gibt es hier zwei relevante Eigenheiten:
+With local ESPHome `2025.3.3`, two practical details matter here:
 
-- Die Beispiele arbeiten bewusst mit expliziten `substitutions` statt auf Package-Defaults zu vertrauen.
-- Programmgenerierte Fonts brauchen weiterhin ein minimales Bootstrap-Font. Dieses steckt jetzt unsichtbar in den generischen `packages/device/*`-Basen, nicht mehr in der Geräte-YAML.
+- the examples intentionally use explicit `substitutions` instead of relying on
+  package defaults
+- generated fonts still need a minimal bootstrap font, which is hidden inside
+  the generic `packages/device/*` base packages rather than repeated in each
+  device YAML
 
-## Repo-Schnitt
+## Repository Scope
 
-Dieses Repo enthält bewusst nur den aktiv gepflegten Pfad:
+This repository intentionally tracks only the actively maintained path:
 
 - `components/tile_dashboard`
 - `packages/base`, `packages/device`, `packages/hardware`, `packages/import`
 - `examples`, `tests`, `scripts`, `assets/fonts`
 
-Ältere Experimente und alternative Kombinatoren bleiben lokal möglich, sind aber absichtlich nicht Teil des versionierten Kern-Repos.
+Older experiments and alternative combinators can still exist locally, but they
+are intentionally not part of the versioned core repository.
 
-## Nächste sinnvolle Ausbaustufen
+## Future Work
 
-- Zusätzliche Hardware-Basen für andere Display-Boards ergänzen.
-- Mehr Beispiel-Geräte-YAMLs mit 3x2- und 4x4-Grids hinzufügen.
-- Die Beispielwerte in [`packages/import/display48_device_base.yaml`](packages/import/display48_device_base.yaml) auf das echte öffentliche Repo und Release-Tags setzen.
+- add more hardware base packages for other display boards
+- add more example device YAMLs with 3x2 and 4x4 grids
+- move the public import references from `@main` to tagged releases
+- continue expanding the UI model with more widgets, paging, focus views, and
+  richer control flows
 
-## Lizenz
+## License
 
-Der Quellcode dieses Repos steht unter der MIT-Lizenz. Siehe [`LICENSE`](LICENSE).
+The repository source code is licensed under MIT. See [`LICENSE`](LICENSE).
 
-Das mitgelieferte Font-Asset unter [`assets/fonts/RobotoCondensed-Regular.ttf`](assets/fonts/RobotoCondensed-Regular.ttf)
-ist ein Drittanbieter-Asset und bleibt unter seiner eigenen Lizenz. Siehe
+The bundled font asset at
+[`assets/fonts/RobotoCondensed-Regular.ttf`](assets/fonts/RobotoCondensed-Regular.ttf)
+is a third-party asset and remains under its own license. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
