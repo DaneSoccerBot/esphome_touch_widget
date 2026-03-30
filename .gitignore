@@ -41,6 +41,8 @@ debug4.yaml
 debug5.yaml
 debug5_simulator.yaml
 display48norelay.yaml
+esphome_real_case.yaml
+esphome_real_case_refactored.yaml
 480.yaml
 480_crash.yaml
 esphome.yaml
