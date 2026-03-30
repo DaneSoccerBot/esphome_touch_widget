@@ -235,7 +235,7 @@ private:
     const int cy = ctx_.y0 + ctx_.scr_h - DOT_BOTTOM_MARGIN;
     for (uint8_t i = 0; i < np; i++) {
       const int cx = start_x + i * DOT_SPACING + DOT_RADIUS;
-      const auto color = (i == active_page_) ? Colors::TEXT : Colors::TILE_BORDER;
+      const auto color = (i == active_page_) ? Colors::NORMAL_TEXT : Colors::TILE_BORDER;
       it.filled_circle(cx, cy, DOT_RADIUS, color);
     }
   }

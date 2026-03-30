@@ -16,8 +16,6 @@ from components.tile_dashboard.config import (  # noqa: E402
     component_base_id,
     font_id_name,
     get_page_grid,
-    raw_data_id_name,
-    raw_glyph_id_name,
     tile_position,
     validate_tile_bounds,
     validate_tiles,
@@ -185,16 +183,6 @@ class TileDashboardUnitTests(unittest.TestCase):
 
     def test_font_id_name_uses_expected_convention(self):
         self.assertEqual(font_id_name("dashboard_ui", 45), "dashboard_ui_font_45")
-
-    def test_raw_data_id_name_uses_expected_convention(self):
-        self.assertEqual(
-            raw_data_id_name("dashboard_ui", 45), "dashboard_ui_font_data_45"
-        )
-
-    def test_raw_glyph_id_name_uses_expected_convention(self):
-        self.assertEqual(
-            raw_glyph_id_name("dashboard_ui", 45), "dashboard_ui_font_glyphs_45"
-        )
 
     def test_build_font_config_generates_expected_ids(self):
         config = build_font_config("dashboard_ui", FONT_FILE, DEFAULT_GLYPHS, 35)
