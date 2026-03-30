@@ -459,11 +459,13 @@ private:
 
   void ensure_fonts_() const
   {
-    if (font_big_ != nullptr && font_small_ != nullptr)
+    const float hpx = static_cast<float>(tile_h());
+    Font *want_big = ctx_.get_font_for_size(hpx * 0.22f);
+    Font *want_small = ctx_.get_font_for_size(hpx * 0.12f);
+    if (font_big_ == want_big && font_small_ == want_small)
       return;
-    const float hpx = float(ctx_.scr_h) / float(std::max(ctx_.rows, 1));
-    font_big_ = ctx_.get_font_for_size(hpx * 0.22f);
-    font_small_ = ctx_.get_font_for_size(hpx * 0.12f);
+    font_big_ = want_big;
+    font_small_ = want_small;
   }
 };
 

@@ -108,6 +108,7 @@ tile_dashboard:
       label: ${climate_zone_b_label}
       payload: climate_zone_b_payload
       entity_id: ${climate_zone_b_entity}
+      fullscreen: true
 
     - type: climate
       col: 2
@@ -115,6 +116,7 @@ tile_dashboard:
       label: ${climate_zone_a_label}
       payload: climate_zone_a_payload
       entity_id: ${climate_zone_a_entity}
+      fullscreen: true
 
     - type: switch
       col: 1

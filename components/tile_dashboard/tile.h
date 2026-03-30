@@ -7,6 +7,7 @@
 #include <tuple>
 #include <utility>
 #include <cstdint>
+#include <optional>
 
 #include "esphome.h"
 #include "esphome/components/display/display.h"
@@ -27,6 +28,10 @@ public:
     ANY
   };
 
+  struct OverrideGeometry {
+    int x, y, w, h;
+  };
+
   Tile(DisplayContext &ctx, uint8_t col, uint8_t row, uint8_t numTilesY, std::string label = {})
       : ctx_(ctx), col_(col), row_(row), numTilesY_(numTilesY), label_(std::move(label)) {}
   virtual ~Tile() = default;
@@ -34,7 +39,25 @@ public:
   uint8_t col() const { return col_; }
   uint8_t row() const { return row_; }
   uint8_t numTilesY() const { return numTilesY_; }
+  bool fullscreen_enabled() const { return fullscreen_enabled_; }
+  void set_fullscreen_enabled(bool v) { fullscreen_enabled_ = v; }
+  bool is_fullscreen() const { return override_geo_.has_value(); }
   void bind_display(Display *disp) { disp_ = disp; }
+
+  void set_override_geometry(OverrideGeometry geo) {
+    override_geo_ = geo;
+    invalidate_cache();
+  }
+  void clear_override_geometry() {
+    override_geo_.reset();
+    invalidate_cache();
+  }
+
+  void invalidate_cache() {
+    const int idx = tile_index();
+    if (idx < static_cast<int>(ctx_.cache_value.size()))
+      ctx_.cache_value[idx].clear();
+  }
 
   void draw(Display &it)
   {
@@ -196,17 +219,20 @@ protected:
                                 rounded ? radius : 0, border);
   }
 
-  int tile_w() const { return ctx_.tile_w(); }
-  int tile_h() const { return ctx_.tile_h(); }
-  int abs_x() const { return ctx_.x0 + (col_ - 1) * tile_w(); }
-  int abs_y() const { return ctx_.y0 + (row_ - 1) * tile_h(); }
+  int tile_w() const { return override_geo_ ? override_geo_->w : ctx_.tile_w(); }
+  int tile_h() const { return override_geo_ ? override_geo_->h : ctx_.tile_h(); }
+  int abs_x() const { return override_geo_ ? override_geo_->x : ctx_.x0 + (col_ - 1) * ctx_.tile_w(); }
+  int abs_y() const { return override_geo_ ? override_geo_->y : ctx_.y0 + (row_ - 1) * ctx_.tile_h(); }
   int tile_index() const { return (row_ - 1) * ctx_.cols + (col_ - 1); }
 
+protected:
   DisplayContext &ctx_;
   uint8_t col_, row_, numTilesY_;
   std::string label_;
   std::string label2_;
-  Display *disp_{nullptr}; 
+  Display *disp_{nullptr};
+  bool fullscreen_enabled_{false};
+  std::optional<OverrideGeometry> override_geo_; 
 
   void request_redraw() {
     if (disp_ != nullptr)

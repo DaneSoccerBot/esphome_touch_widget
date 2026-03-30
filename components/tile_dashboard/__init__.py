@@ -33,6 +33,7 @@ CONF_TOP_UNIT = "top_unit"
 CONF_TOUCH_ROTATION = "touch_rotation"
 CONF_TOUCHSCREEN = "touchscreen"
 CONF_UNIT = "unit"
+CONF_FULLSCREEN = "fullscreen"
 CONF_YELLOW_THRESHOLD = "yellow_threshold"
 
 AUTO_INCLUDES = (
@@ -67,6 +68,7 @@ TILE_POSITION_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_COL): cv.int_range(min=1),
         cv.Required(CONF_ROW): cv.int_range(min=1),
+        cv.Optional(CONF_FULLSCREEN, default=False): cv.boolean,
     }
 )
 
@@ -221,6 +223,7 @@ async def to_code(config):
                     tile[CONF_ROW],
                     tile[CONF_LABEL],
                     sensor_var,
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "text_value":
@@ -233,6 +236,7 @@ async def to_code(config):
                     tile[CONF_UNIT],
                     tile[CONF_FORMAT],
                     sensor_var,
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "double_value":
@@ -250,6 +254,7 @@ async def to_code(config):
                     tile["bottom_format"],
                     top_sensor,
                     bottom_sensor,
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "gauge":
@@ -266,6 +271,7 @@ async def to_code(config):
                     tile[CONF_YELLOW_THRESHOLD],
                     tile[CONF_UNIT],
                     tile[CONF_FORMAT],
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "climate":
@@ -277,6 +283,7 @@ async def to_code(config):
                     tile[CONF_LABEL],
                     payload,
                     tile[CONF_ENTITY_ID],
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "switch":
@@ -288,6 +295,7 @@ async def to_code(config):
                     tile[CONF_LABEL],
                     switch_var,
                     tile[CONF_ENTITY_ID],
+                    tile[CONF_FULLSCREEN],
                 )
             )
         elif tile_type == "light":
@@ -299,5 +307,6 @@ async def to_code(config):
                     tile[CONF_LABEL],
                     state,
                     tile[CONF_ENTITY_ID],
+                    tile[CONF_FULLSCREEN],
                 )
             )

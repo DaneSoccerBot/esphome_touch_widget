@@ -67,7 +67,11 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
       return;
     this->last_touch_ = mapped;
     this->last_touch_valid_ = true;
-    this->dashboard_.dispatch_touch(mapped.col, mapped.row, mapped.local_x, mapped.local_y);
+    if (this->dashboard_.is_fullscreen()) {
+      this->dashboard_.dispatch_touch(0, 0, mapped.local_x_raw, mapped.local_y_raw);
+    } else {
+      this->dashboard_.dispatch_touch(mapped.col, mapped.row, mapped.local_x, mapped.local_y);
+    }
   }
 
   void update(const touchscreen::TouchPoints_t &tpoints) override {
@@ -77,7 +81,11 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
         continue;
       this->last_touch_ = mapped;
       this->last_touch_valid_ = true;
-      this->dashboard_.dispatch_touch_update(mapped.col, mapped.row, mapped.local_x, mapped.local_y);
+      if (this->dashboard_.is_fullscreen()) {
+        this->dashboard_.dispatch_touch_update(0, 0, mapped.local_x_raw, mapped.local_y_raw);
+      } else {
+        this->dashboard_.dispatch_touch_update(mapped.col, mapped.row, mapped.local_x, mapped.local_y);
+      }
       break;
     }
   }
@@ -85,9 +93,14 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   void release() override {
     if (!this->last_touch_valid_)
       return;
-    this->dashboard_.dispatch_touch_release(
-        this->last_touch_.col, this->last_touch_.row,
-        this->last_touch_.local_x, this->last_touch_.local_y);
+    if (this->dashboard_.is_fullscreen()) {
+      this->dashboard_.dispatch_touch_release(
+          0, 0, this->last_touch_.local_x_raw, this->last_touch_.local_y_raw);
+    } else {
+      this->dashboard_.dispatch_touch_release(
+          this->last_touch_.col, this->last_touch_.row,
+          this->last_touch_.local_x, this->last_touch_.local_y);
+    }
     this->last_touch_valid_ = false;
   }
 
@@ -117,17 +130,19 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   }
 
   void add_battery_tile(uint8_t col, uint8_t row, std::string label,
-                        sensor::Sensor *sensor) {
-    this->dashboard_.add_tile<BatteryTile>(
+                        sensor::Sensor *sensor, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<BatteryTile>(
         this->ctx_, col, row, std::move(label), BatteryTile::Cfg{sensor});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_text_value_tile(uint8_t col, uint8_t row, std::string label,
                            std::string unit, std::string fmt,
-                           sensor::Sensor *sensor) {
-    this->dashboard_.add_tile<TextValueTile>(
+                           sensor::Sensor *sensor, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<TextValueTile>(
         this->ctx_, col, row, std::move(label), std::move(unit),
         std::move(fmt), TextValueTile::Cfg{sensor});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_double_value_tile(uint8_t col, uint8_t row,
@@ -135,18 +150,19 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
                              std::string top_unit, std::string bottom_unit,
                              std::string fmt_top, std::string fmt_bottom,
                              sensor::Sensor *top_sensor,
-                             sensor::Sensor *bottom_sensor) {
-    this->dashboard_.add_tile<DoubleValueTile>(
+                             sensor::Sensor *bottom_sensor, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<DoubleValueTile>(
         this->ctx_, col, row, std::move(top_label), std::move(bottom_label),
         std::move(top_unit), std::move(bottom_unit), std::move(fmt_top),
         std::move(fmt_bottom), DoubleValueTile::Cfg{top_sensor, bottom_sensor});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_gauge_tile(uint8_t col, uint8_t row, std::string label,
                       sensor::Sensor *sensor, float min_value, float max_value,
                       float red_threshold, float yellow_threshold,
-                      std::string unit, std::string fmt) {
-    this->dashboard_.add_tile<GaugeTile>(
+                      std::string unit, std::string fmt, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<GaugeTile>(
         this->ctx_, col, row, std::move(label),
         GaugeTile::Cfg{
             sensor,
@@ -156,28 +172,32 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
             std::move(unit),
             std::move(fmt),
         });
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_climate_tile(uint8_t col, uint8_t row, std::string label,
                         text_sensor::TextSensor *payload,
-                        std::string entity_id) {
-    this->dashboard_.add_tile<ClimateTile>(
+                        std::string entity_id, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<ClimateTile>(
         this->ctx_, col, row, std::move(label),
         ClimateTile::Cfg{payload, std::move(entity_id)});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_switch_tile(uint8_t col, uint8_t row, std::string label,
-                       switch_::Switch *sw, std::string entity_id) {
-    this->dashboard_.add_tile<SwitchTile>(
+                       switch_::Switch *sw, std::string entity_id, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<SwitchTile>(
         this->ctx_, col, row, std::move(label),
         SwitchTile::Cfg{sw, std::move(entity_id)});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
   void add_light_tile(uint8_t col, uint8_t row, std::string label,
-                      text_sensor::TextSensor *state, std::string entity_id) {
-    this->dashboard_.add_tile<LightTile>(
+                      text_sensor::TextSensor *state, std::string entity_id, bool fullscreen = false) {
+    auto &t = this->dashboard_.add_tile<LightTile>(
         this->ctx_, col, row, std::move(label),
         LightTile::Cfg{state, std::move(entity_id)});
+    t.set_fullscreen_enabled(fullscreen);
   }
 
  protected:
@@ -186,6 +206,16 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     if (!this->screen_initialized_) {
       it.fill(Colors::SCREEN_BACKGROUND);
       this->screen_initialized_ = true;
+    }
+    if (this->was_fullscreen_ && !this->dashboard_.is_fullscreen()) {
+      // returning from fullscreen → clear and force full grid redraw
+      it.fill(Colors::SCREEN_BACKGROUND);
+      this->was_fullscreen_ = false;
+    }
+    if (!this->was_fullscreen_ && this->dashboard_.is_fullscreen()) {
+      // entering fullscreen → clear screen for the focused tile
+      it.fill(Colors::SCREEN_BACKGROUND);
+      this->was_fullscreen_ = true;
     }
     this->dashboard_.draw(it);
   }
@@ -238,6 +268,7 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
 
   bool context_ready_{false};
   bool screen_initialized_{false};
+  bool was_fullscreen_{false};
   bool last_touch_valid_{false};
   TouchMapping last_touch_{};
 };

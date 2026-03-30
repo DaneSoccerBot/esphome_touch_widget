@@ -14,6 +14,8 @@ struct TouchMapping {
   int row{1};
   int local_x{0};
   int local_y{0};
+  int local_x_raw{0};
+  int local_y_raw{0};
 };
 
 inline TouchMapping map_touch(int x, int y, int width, int height,
@@ -61,6 +63,8 @@ inline TouchMapping map_touch(int x, int y, int width, int height,
   mapped.row = std::clamp(mapped.rotated_y / tile_h + 1, 1, rows);
   mapped.local_x = std::clamp(mapped.rotated_x % tile_w, 0, tile_w - 1);
   mapped.local_y = std::clamp(mapped.rotated_y % tile_h, 0, tile_h - 1);
+  mapped.local_x_raw = std::clamp(mapped.rotated_x, 0, width - 1);
+  mapped.local_y_raw = std::clamp(mapped.rotated_y, 0, height - 1);
   return mapped;
 }
 
