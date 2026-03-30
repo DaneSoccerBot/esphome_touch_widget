@@ -13,6 +13,7 @@ if str(SCRIPTS) not in sys.path:
 from tooling import (  # noqa: E402
     build_platformio_env,
     build_windows_msys2_env,
+    check_host_simulator_support,
     detect_windows_msys2_root,
     ensure_windows_sdl2_config_wrapper,
     get_windows_sdl2_options,
@@ -107,6 +108,21 @@ class ToolingTests(unittest.TestCase):
         with mock.patch("tooling.get_windows_sdl2_options", return_value="-Ifoo -Lbar -lSDL2"):
             args = simulator_substitution_args()
         self.assertEqual(args, ["-s", "simulator_sdl_options", "-Ifoo -Lbar -lSDL2"])
+
+    def test_check_host_simulator_support_uses_windows_sdl_options(self):
+        with mock.patch("tooling.os.name", "nt"):
+            with mock.patch("tooling.get_windows_sdl2_options", return_value="-Ifoo -Lbar -lSDL2"):
+                ready, message = check_host_simulator_support()
+        self.assertTrue(ready)
+        self.assertEqual(message, "SDL2 development files detected via MSYS2.")
+
+    def test_check_host_simulator_support_reports_missing_windows_sdl_options(self):
+        with mock.patch("tooling.os.name", "nt"):
+            with mock.patch("tooling.platform.system", return_value="Windows"):
+                with mock.patch("tooling.get_windows_sdl2_options", return_value=None):
+                    ready, message = check_host_simulator_support()
+        self.assertFalse(ready)
+        self.assertIn("bootstrap.ps1", message)
 
 
 if __name__ == "__main__":

@@ -211,12 +211,19 @@ def host_simulator_hint() -> str:
 
 
 def check_host_simulator_support() -> tuple[bool, str]:
+    if os.name == "nt":
+        sdl_options = get_windows_sdl2_options()
+        if not sdl_options:
+            return False, host_simulator_hint()
+        return True, "SDL2 development files detected via MSYS2."
+
     env = tooling_env()
-    if shutil.which("sdl2-config", path=env.get("PATH")) is None:
+    sdl2_config = shutil.which("sdl2-config", path=env.get("PATH"))
+    if sdl2_config is None:
         return False, host_simulator_hint()
     try:
         result = subprocess.run(
-            ["sdl2-config", "--cflags", "--libs"],
+            [sdl2_config, "--cflags", "--libs"],
             cwd=ROOT,
             env=env,
             stdout=subprocess.DEVNULL,
