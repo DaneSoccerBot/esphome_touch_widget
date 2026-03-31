@@ -189,9 +189,11 @@ protected:
     int x0 = abs_x(), y0 = abs_y();
     int w = tile_w(), h = tile_h();
     it.start_clipping(x0, y0, x0 + w, y0 + h);
-    // Zuerst gesamten Tile-Bereich mit Screen-Hintergrund füllen
-    // (ersetzt globales fill() bei Transitions — deckt auch Ecken/Gaps ab)
-    it.filled_rectangle(x0, y0, w, h, Colors::SCREEN_BACKGROUND);
+    // Im Fullscreen die große Hintergrundfüllung überspringen —
+    // render_background + draw_content decken den Bereich komplett ab
+    if (!is_fullscreen()) {
+      it.filled_rectangle(x0, y0, w, h, Colors::SCREEN_BACKGROUND);
+    }
     render_background(it);
     draw_labels(it);
     draw_content(it);
@@ -255,11 +257,19 @@ protected:
   std::optional<OverrideGeometry> override_geo_; 
 
   void request_redraw() {
-    if (disp_ != nullptr)
-      disp_->update();           // Pointer →   ->
+    invalidate_cache();
+    redraw_pending_ = true;
+  }
+
+public:
+  bool consume_redraw_pending() {
+    bool v = redraw_pending_;
+    redraw_pending_ = false;
+    return v;
   }
 
 private:
+  bool redraw_pending_{false};
   std::map<TouchArea, std::function<void()>> touch_;
 };
 #endif

@@ -49,6 +49,15 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     }
   }
 
+  void loop() override {
+    // Pending redraws von Tile-Callbacks (z.B. Switch-State, Climate-Payload)
+    // werden hier gesammelt und als ein einziger display_->update() verarbeitet.
+    if (this->dashboard_.consume_pending_redraws()) {
+      if (this->display_ != nullptr)
+        this->display_->update();
+    }
+  }
+
   void dump_config() override {
     ESP_LOGCONFIG(TAG, "Tile Dashboard:");
     if (this->display_ != nullptr) {

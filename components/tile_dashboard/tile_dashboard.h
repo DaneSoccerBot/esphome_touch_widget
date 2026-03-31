@@ -82,6 +82,15 @@ public:
     if (num_pages() > 1) draw_page_indicator_(it);
   }
 
+  /** Prüft ob ein Tile ein Redraw-Flag hat und konsumiert es. */
+  bool consume_pending_redraws() {
+    bool any = false;
+    for (auto &t : tiles_) {
+      if (t->consume_redraw_pending()) any = true;
+    }
+    return any;
+  }
+
   void clear(){ tiles_.clear(); focused_tile_ = nullptr; active_page_ = 0; }
 
   // --- Fullscreen ---

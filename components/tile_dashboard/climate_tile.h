@@ -225,14 +225,19 @@ protected:
     // Arc 135°..405° → max nach oben: sin(270°)=-1 → volle Ausdehnung
     // Max nach unten: sin(135°)=0.707 → nur ~71% der Ausdehnung
     const int y_bottom = static_cast<int>(std::ceil(0.7072f * arc_r)) + marker_r + 1;
-    const int buf_x = cx - extent;
-    const int buf_y = cy - extent;
     const int buf_w = 2 * extent + 1;
     const int buf_h = extent + y_bottom + 1;
-    const int bcx = cx - buf_x;
-    const int bcy = cy - buf_y;
 
-    if (arc_buf_.ensure(buf_w, buf_h)) {
+    // Auf ESP32 den PixelBuffer auf max ~64KB (256x128) begrenzen,
+    // damit PSRAM-Allokation + DMA-Transfer schnell bleibt
+    static constexpr int MAX_BUF_PIXELS = 256 * 128;
+    const bool use_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS) && arc_buf_.ensure(buf_w, buf_h);
+
+    if (use_buffer) {
+      const int buf_x = cx - extent;
+      const int buf_y = cy - extent;
+      const int bcx = cx - buf_x;
+      const int bcy = cy - buf_y;
       arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
       const uint16_t c_orange = PixelBuffer::to_565(Colors::ORANGE);
@@ -256,9 +261,11 @@ protected:
 
       arc_buf_.blit(it, buf_x, buf_y);
     } else {
-      // Fallback: direkte Methode wenn Buffer-Allokation fehlschlägt
-      for (int i = 0; i < 100; i++) {
-        float deg = start + i * (span / 100);
+      // Fallback: direkte Methode wenn Buffer zu groß / Allokation fehlschlägt
+      // Weniger Segmente um DMA-Transfers zu reduzieren
+      const int segments = std::min(100, std::max(30, radius / 3));
+      for (int i = 0; i < segments; i++) {
+        float deg = start + i * (span / segments);
         float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
         int px = cx + std::cos(rad_f) * (radius - thick / 2);
         int py = cy + std::sin(rad_f) * (radius - thick / 2);

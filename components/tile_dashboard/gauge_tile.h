@@ -108,7 +108,11 @@ protected:
       const int bcx = cx - buf_x;
       const int bcy = cy - buf_y;
 
-      if (arc_buf_.ensure(buf_w, buf_h)) {
+      // Auf ESP32 den PixelBuffer auf max ~64KB begrenzen
+      static constexpr int MAX_BUF_PIXELS = 256 * 128;
+      const bool use_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS) && arc_buf_.ensure(buf_w, buf_h);
+
+      if (use_buffer) {
         arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
         arc_buf_.filled_arc(bcx, bcy, radius, inner_radius,
