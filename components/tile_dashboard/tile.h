@@ -187,7 +187,11 @@ protected:
   virtual void render_full(Display &it)
   {
     int x0 = abs_x(), y0 = abs_y();
-    it.start_clipping(x0, y0, x0 + tile_w(), y0 + tile_h());
+    int w = tile_w(), h = tile_h();
+    it.start_clipping(x0, y0, x0 + w, y0 + h);
+    // Zuerst gesamten Tile-Bereich mit Screen-Hintergrund füllen
+    // (ersetzt globales fill() bei Transitions — deckt auch Ecken/Gaps ab)
+    it.filled_rectangle(x0, y0, w, h, Colors::SCREEN_BACKGROUND);
     render_background(it);
     draw_labels(it);
     draw_content(it);

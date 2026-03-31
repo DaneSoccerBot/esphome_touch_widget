@@ -89,7 +89,9 @@ public:
 
   void enter_fullscreen(Tile *t) {
     focused_tile_ = t;
-    t->set_override_geometry({ctx_.x0, ctx_.y0, ctx_.scr_w, ctx_.scr_h});
+    // Fullscreen nutzt die gesamte physische Display-Fläche
+    t->set_override_geometry({ctx_.x0, ctx_.y0 - ctx_.status_bar_h,
+                              ctx_.scr_w, ctx_.display_h});
   }
 
   void exit_fullscreen() {
@@ -184,7 +186,6 @@ private:
   static constexpr int CLOSE_BTN_MARGIN = 8;
   static constexpr int DOT_RADIUS = 4;
   static constexpr int DOT_SPACING = 14;
-  static constexpr int DOT_BOTTOM_MARGIN = 10;
 
   uint8_t default_cols_{1}, default_rows_{1};
   std::map<uint8_t, PageGrid> page_grids_;
@@ -232,7 +233,9 @@ private:
     const uint8_t np = num_pages();
     const int total_w = np * DOT_RADIUS * 2 + (np - 1) * (DOT_SPACING - DOT_RADIUS * 2);
     const int start_x = ctx_.x0 + (ctx_.scr_w - total_w) / 2;
-    const int cy = ctx_.y0 + ctx_.scr_h - DOT_BOTTOM_MARGIN;
+    // Dots in der Status-Bar zeichnen (vertikal zentriert)
+    const int bar_h = ctx_.status_bar_h > 0 ? ctx_.status_bar_h : 16;
+    const int cy = ctx_.y0 - ctx_.status_bar_h + bar_h / 2;
     for (uint8_t i = 0; i < np; i++) {
       const int cx = start_x + i * DOT_SPACING + DOT_RADIUS;
       const auto color = (i == active_page_) ? Colors::NORMAL_TEXT : Colors::TILE_BORDER;

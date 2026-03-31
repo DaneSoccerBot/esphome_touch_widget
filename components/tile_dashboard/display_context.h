@@ -42,9 +42,11 @@ using esphome::font::Font;
 struct DisplayContext
 {
     // --- Raster / Geometrie --------------------------------------------------
-    int scr_w{0}, scr_h{0}; ///< komplette Display-Auflösung in Pixeln
+    int scr_w{0}, scr_h{0}; ///< Tile-Bereich (abzgl. Status-Bar)
     int cols{1}, rows{1};   ///< Anzahl Spalten / Zeilen im Dashboard
-    int x0{0}, y0{0};       ///< Pixel-Offset links oben (nützlich bei Rahmen)
+    int x0{0}, y0{0};       ///< Pixel-Offset links oben (unterhalb Status-Bar)
+    int display_h{0};       ///< physische Display-Höhe (für Fullscreen)
+    int status_bar_h{0};    ///< Höhe der Status-Bar in Pixeln (0 = aus)
 
     // --- Fonts ---------------------------------------------------------------
     Font *roboto_12{}, *roboto_14{}, *roboto_16{}, *roboto_18{},
@@ -137,13 +139,14 @@ struct DisplayContext
                   int offset_x, int offset_y)
     {
         scr_w = width;
-        scr_h = height;
+        display_h = height;
+        scr_h = height - status_bar_h;
 
         cols = grid_cols;
         rows = grid_rows == 0 ? 1 : grid_rows;
 
         x0 = offset_x;
-        y0 = offset_y;
+        y0 = offset_y + status_bar_h;
 
         const float size_value_compact = (scr_h / rows) * 0.30f;
         const float size_label_compact = (scr_h / rows) * 0.1f;

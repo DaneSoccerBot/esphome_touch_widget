@@ -12,6 +12,7 @@
 
 #include "tile.h"
 #include "colors.h"
+#include "pixel_buffer.h"
 
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/api/homeassistant_service.h"
@@ -211,28 +212,65 @@ protected:
     const int thick = std::max(4, int(size * 0.09f));
     const int br = std::max(2, thick / 2);
 
-    // Ring
+    // Ring — in PixelBuffer rendern, dann einmal blitten
     float prog = std::clamp((tgt - cache_.min_t) / (cache_.max_t - cache_.min_t), 0.f, 1.f);
     constexpr float span = 270, start = 135;
     float filled = span * prog;
 
-    for (int i = 0; i < 100; i++)
-    {
-      float deg = start + i * (span / 100);
-      float rad = deg * M_PI / 180;
-      int px = cx + std::cos(rad) * (radius - thick / 2);
-      int py = cy + std::sin(rad) * (radius - thick / 2);
-      it.filled_circle(px, py, br,
-                       (deg <= start + filled) ? Colors::ORANGE : Colors::LIGHT_GREY);
-    }
+    // Arc-Bounding-Box: eng um den tatsächlichen Inhalt
+    // Kreise sitzen bei arc_r = (radius - thick/2) vom Zentrum, Marker-Radius = br+2
+    const int arc_r = radius - thick / 2;
+    const int marker_r = br + 2;
+    const int extent = arc_r + marker_r + 1;
+    // Arc 135°..405° → max nach oben: sin(270°)=-1 → volle Ausdehnung
+    // Max nach unten: sin(135°)=0.707 → nur ~71% der Ausdehnung
+    const int y_bottom = static_cast<int>(std::ceil(0.7072f * arc_r)) + marker_r + 1;
+    const int buf_x = cx - extent;
+    const int buf_y = cy - extent;
+    const int buf_w = 2 * extent + 1;
+    const int buf_h = extent + y_bottom + 1;
+    const int bcx = cx - buf_x;
+    const int bcy = cy - buf_y;
 
-    if (!std::isnan(tgt))
-    {
-      // Marker
-      float mrad = (start + filled) * M_PI / 180;
-      it.filled_circle(cx + std::cos(mrad) * (radius - thick / 2),
-                       cy + std::sin(mrad) * (radius - thick / 2),
-                       br + 2, esphome::Color::WHITE);
+    if (arc_buf_.ensure(buf_w, buf_h)) {
+      arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
+
+      const uint16_t c_orange = PixelBuffer::to_565(Colors::ORANGE);
+      const uint16_t c_grey = PixelBuffer::to_565(Colors::LIGHT_GREY);
+      for (int i = 0; i < 100; i++) {
+        float deg = start + i * (span / 100);
+        float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
+        int px = bcx + std::cos(rad_f) * (radius - thick / 2);
+        int py = bcy + std::sin(rad_f) * (radius - thick / 2);
+        arc_buf_.filled_circle(px, py, br,
+                               (deg <= start + filled) ? c_orange : c_grey);
+      }
+
+      if (!std::isnan(tgt)) {
+        float mrad = (start + filled) * static_cast<float>(M_PI) / 180.0f;
+        int mx = bcx + std::cos(mrad) * (radius - thick / 2);
+        int my = bcy + std::sin(mrad) * (radius - thick / 2);
+        arc_buf_.filled_circle(mx, my, br + 2,
+                               PixelBuffer::to_565(esphome::Color::WHITE));
+      }
+
+      arc_buf_.blit(it, buf_x, buf_y);
+    } else {
+      // Fallback: direkte Methode wenn Buffer-Allokation fehlschlägt
+      for (int i = 0; i < 100; i++) {
+        float deg = start + i * (span / 100);
+        float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
+        int px = cx + std::cos(rad_f) * (radius - thick / 2);
+        int py = cy + std::sin(rad_f) * (radius - thick / 2);
+        it.filled_circle(px, py, br,
+                         (deg <= start + filled) ? Colors::ORANGE : Colors::LIGHT_GREY);
+      }
+      if (!std::isnan(tgt)) {
+        float mrad = (start + filled) * static_cast<float>(M_PI) / 180.0f;
+        it.filled_circle(cx + std::cos(mrad) * (radius - thick / 2),
+                         cy + std::sin(mrad) * (radius - thick / 2),
+                         br + 2, esphome::Color::WHITE);
+      }
     }
     // Zahlen/Text
     char buf[16];
@@ -427,6 +465,7 @@ private:
   /* ---------- Member ---------- */
   Cfg cfg_;
   mutable Font *font_big_{nullptr}, *font_small_{nullptr};
+  PixelBuffer arc_buf_;
 
   /* ------------------------------------------------------------------
    *  Hilfsfunktion: zerlegt "target/current/mode" in 3 Teile

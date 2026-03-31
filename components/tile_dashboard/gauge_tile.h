@@ -9,6 +9,7 @@
 #include <cstdio>
 #include "tile.h"
 #include "colors.h" // Farbkonstanten
+#include "pixel_buffer.h"
 #include "esphome/components/sensor/sensor.h"
 
 using esphome::display::Display;
@@ -89,11 +90,6 @@ protected:
       frac = std::clamp(frac, 0.0f, 1.0f);
       float filled_angle = start_angle + angle_range * frac;
 
-      // Hintergrund-Segment
-      draw_arc_segment(it, cx, cy, radius, inner_radius,
-                       start_angle, start_angle + angle_range,
-                       Colors::SCREEN_BACKGROUND);
-
       // Füllfarbe bestimmen
       esphome::Color fill_color = Colors::GREEN;
       if (value < thr_.red)
@@ -101,13 +97,42 @@ protected:
       else if (value < thr_.yellow)
         fill_color = Colors::YELLOW;
 
-      // Vordergrund-Segment
-      draw_arc_segment(it, cx, cy, radius, inner_radius,
-                       start_angle, filled_angle,
-                       fill_color);
+      // Arc in PixelBuffer rendern (1 DMA-Transfer statt ~120 Dreiecke)
+      // Gauge-Arc geht von 180°-360° (oberer Halbkreis), reicht nur bis cy nach unten
+      const int arc_margin = static_cast<int>(std::ceil(radius)) + 2;
+      const int buf_x = cx - arc_margin;
+      const int buf_y = cy - arc_margin;
+      const int buf_w = 2 * arc_margin + 1;
+      // Buffer-Höhe: nur bis cy + inner_radius (unterer Rand des Innenkreises)
+      const int buf_h = arc_margin + static_cast<int>(std::ceil(inner_radius)) + 2;
+      const int bcx = cx - buf_x;
+      const int bcy = cy - buf_y;
 
-      // Innenkreis
-      it.filled_circle(cx, cy, inner_radius, Colors::TILE_BACKGROUND);
+      if (arc_buf_.ensure(buf_w, buf_h)) {
+        arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
+
+        arc_buf_.filled_arc(bcx, bcy, radius, inner_radius,
+                            start_angle, start_angle + angle_range,
+                            PixelBuffer::to_565(Colors::SCREEN_BACKGROUND));
+
+        arc_buf_.filled_arc(bcx, bcy, radius, inner_radius,
+                            start_angle, filled_angle,
+                            PixelBuffer::to_565(fill_color));
+
+        arc_buf_.filled_circle(bcx, bcy, static_cast<int>(inner_radius),
+                               PixelBuffer::to_565(Colors::TILE_BACKGROUND));
+
+        arc_buf_.blit(it, buf_x, buf_y);
+      } else {
+        // Fallback: direkt zeichnen
+        draw_arc_segment(it, cx, cy, radius, inner_radius,
+                         start_angle, start_angle + angle_range,
+                         Colors::SCREEN_BACKGROUND);
+        draw_arc_segment(it, cx, cy, radius, inner_radius,
+                         start_angle, filled_angle, fill_color);
+        it.filled_circle(cx, cy, inner_radius, Colors::TILE_BACKGROUND);
+      }
+
       it.end_clipping();
       prev_gauge_val_ = val_;
     }
@@ -165,6 +190,7 @@ private:
   Font *gauge_font_{nullptr};
   float prev_val_{NAN};
   float prev_gauge_val_{NAN};
+  PixelBuffer arc_buf_;
 
   std::tuple<int, int, int, int> gauge_value_clip() const
   {

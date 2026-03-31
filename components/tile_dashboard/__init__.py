@@ -39,6 +39,7 @@ CONF_COLSPAN = "colspan"
 CONF_ROWSPAN = "rowspan"
 CONF_PAGE_CONFIGS = "page_configs"
 CONF_YELLOW_THRESHOLD = "yellow_threshold"
+CONF_STATUS_BAR_HEIGHT = "status_bar_height"
 
 AUTO_INCLUDES = (
     "esphome/components/tile_dashboard/tile_dashboard.h",
@@ -178,6 +179,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_OFFSET_X, default=0): cv.int_,
             cv.Optional(CONF_OFFSET_Y, default=0): cv.int_,
             cv.Optional(CONF_TOUCH_ROTATION, default=0): cv.one_of(0, 90, 180, 270, int=True),
+            cv.Optional(CONF_STATUS_BAR_HEIGHT, default=16): cv.int_range(min=0, max=60),
             cv.Optional(CONF_FONT_FILE, default="gfonts://Roboto Condensed"): font.font_file_schema,
             cv.Optional(CONF_GLYPHS, default=DEFAULT_GLYPHS): cv.ensure_list(cv.string_strict),
             cv.Optional(CONF_PAGE_CONFIGS, default=[]): cv.ensure_list(PAGE_CONFIG_SCHEMA),
@@ -225,6 +227,7 @@ async def to_code(config):
         )
     )
     cg.add(var.set_touch_rotation(config[CONF_TOUCH_ROTATION]))
+    cg.add(var.set_status_bar_height(config[CONF_STATUS_BAR_HEIGHT]))
 
     for page_config in config[CONF_PAGE_CONFIGS]:
         cg.add(var.set_page_grid(
