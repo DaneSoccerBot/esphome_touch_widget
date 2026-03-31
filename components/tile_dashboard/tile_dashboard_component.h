@@ -167,7 +167,6 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     this->offset_x_ = offset_x;
     this->offset_y_ = offset_y;
     this->context_ready_ = false;
-    this->screen_initialized_ = false;
     this->dashboard_.set_default_grid(this->cols_, this->rows_);
   }
 
@@ -176,7 +175,6 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   void set_status_bar_height(int h) {
     this->status_bar_height_ = h;
     this->context_ready_ = false;
-    this->screen_initialized_ = false;
   }
 
   void set_page_grid(uint8_t page, uint8_t cols, uint8_t rows) {
@@ -293,11 +291,8 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
  protected:
   void render_(display::Display &it) {
     this->configure_context_();
-    if (!this->screen_initialized_) {
-      // Einmaliges fill() nur bei allererster Initialisierung
-      it.fill(Colors::SCREEN_BACKGROUND);
-      this->screen_initialized_ = true;
-    }
+    // Kein globales it.fill() nötig — jedes Tile füllt seinen Bereich
+    // selbst via render_full() → filled_rectangle(SCREEN_BACKGROUND).
     // Status-Bar zeichnen (Hintergrund, falls Page-Indicator sichtbar)
     if (this->ctx_.status_bar_h > 0) {
       draw_status_bar_(it);
@@ -346,7 +341,6 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
         resolved_width, resolved_height, this->cols_, this->rows_,
         this->offset_x_, this->offset_y_);
     this->context_ready_ = true;
-    this->screen_initialized_ = false;
   }
 
   void draw_status_bar_(display::Display &it) {
@@ -382,7 +376,6 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   static constexpr int SWIPE_THRESHOLD = 50;
 
   bool context_ready_{false};
-  bool screen_initialized_{false};
   bool was_fullscreen_{false};
   bool last_touch_valid_{false};
   bool swipe_possible_{false};
