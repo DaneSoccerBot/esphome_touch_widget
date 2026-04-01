@@ -1,3 +1,6 @@
+substitutions:
+  dashboard_display_rotation: "0"
+
 i2c:
   - id: bus_a
     sda: GPIO19
@@ -56,7 +59,7 @@ touchscreen:
 display:
   - platform: st7701s
     id: dashboard_display
-    rotation: 0
+    rotation: ${dashboard_display_rotation}
     # 'never' — alle Redraws explizit über display_->update() in touch/loop
     update_interval: never
     auto_clear_enabled: false
