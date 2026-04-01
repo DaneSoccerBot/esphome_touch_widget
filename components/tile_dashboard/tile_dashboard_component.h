@@ -6,6 +6,9 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#ifdef USE_ESP32
+#include "esp_heap_caps.h"
+#endif
 #include "esphome/components/display/display.h"
 #include "esphome/components/touchscreen/touchscreen.h"
 #include "esphome/components/sensor/sensor.h"
@@ -32,6 +35,8 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
  public:
   TileDashboardComponent() : dashboard_(ctx_) {}
 
+  Dashboard &get_dashboard() { return dashboard_; }
+
   float get_setup_priority() const override { return setup_priority::LATE; }
 
   void setup() override {
@@ -50,6 +55,14 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   }
 
   void loop() override {
+    // Initialer Render: bei update_interval=never wird der Writer nie
+    // automatisch aufgerufen. Einmalig im ersten Loop-Durchlauf triggern.
+    if (this->initial_render_pending_) {
+      this->initial_render_pending_ = false;
+      if (this->display_ != nullptr)
+        this->display_->update();
+      return;
+    }
     // Pending redraws von Tile-Callbacks (z.B. Switch-State, Climate-Payload)
     // werden hier gesammelt und als ein einziger display_->update() verarbeitet.
     if (this->dashboard_.consume_pending_redraws()) {
@@ -91,7 +104,7 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     } else {
       this->dashboard_.dispatch_touch(mapped.col, mapped.row, mapped.local_x, mapped.local_y);
     }
-    // Sofort-Redraw bei Moduswechsel (statt auf update_interval zu warten)
+    // Sofort-Redraw bei Close-Button (nicht bei pending fullscreen)
     if (was_fs != this->dashboard_.is_fullscreen() && this->display_ != nullptr) {
       this->display_->update();
     }
@@ -133,7 +146,8 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
       const int abs_dx = dx < 0 ? -dx : dx;
       const int abs_dy = dy < 0 ? -dy : dy;
       if (abs_dx > SWIPE_THRESHOLD && abs_dx > abs_dy * 2) {
-        // Horizontal swipe detected
+        // Horizontal swipe detected — cancel any pending fullscreen
+        this->dashboard_.cancel_pending_fullscreen();
         if (dx < 0) {
           this->dashboard_.next_page();
         } else {
@@ -148,11 +162,34 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
       }
     }
     this->swipe_possible_ = false;
+    // Tap-Threshold: Aktion nur wenn Finger-Bewegung minimal war
+    // Verhindert versehentliche Clicks/Temp-Änderungen bei Wischbewegungen
+    const int tdx = this->last_touch_.local_x_raw - this->swipe_start_x_;
+    const int tdy = this->last_touch_.local_y_raw - this->swipe_start_y_;
+    const bool is_tap = (tdx * tdx + tdy * tdy <= TAP_THRESHOLD_SQ);
     bool was_fs = this->dashboard_.is_fullscreen();
     if (was_fs) {
-      this->dashboard_.dispatch_touch_release(
-          0, 0, this->last_touch_.local_x_raw, this->last_touch_.local_y_raw);
+      if (!is_tap) {
+        // Kein Tap → keine Aktion (aber pending_close bleibt gültig da vom close_button_hit)
+        // pending_close wurde bei touch-down gesetzt und ist ein präziser Hit-Test
+        this->last_touch_valid_ = false;
+        // pending_close trotzdem ausführen (Close-Button ist ein separater Hit-Test)
+        if (this->dashboard_.is_fullscreen()) {
+          // Wenn wir hier sind ist es kein Tap aber vielleicht ein Close
+          // → dispatch_touch_release prüft pending_close_ intern
+          this->dashboard_.dispatch_touch_release(
+              0, 0, this->last_touch_.local_x_raw, this->last_touch_.local_y_raw);
+        }
+      } else {
+        this->dashboard_.dispatch_touch_release(
+            0, 0, this->last_touch_.local_x_raw, this->last_touch_.local_y_raw);
+      }
     } else {
+      if (!is_tap) {
+        this->dashboard_.cancel_pending_fullscreen();
+        this->last_touch_valid_ = false;
+        return;
+      }
       this->dashboard_.dispatch_touch_release(
           this->last_touch_.col, this->last_touch_.row,
           this->last_touch_.local_x, this->last_touch_.local_y);
@@ -300,23 +337,35 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
  protected:
   void render_(display::Display &it) {
     this->configure_context_();
-    // Kein globales it.fill() nötig — jedes Tile füllt seinen Bereich
-    // selbst via render_full() → filled_rectangle(SCREEN_BACKGROUND).
-    // Status-Bar zeichnen (Hintergrund, falls Page-Indicator sichtbar)
-    if (this->ctx_.status_bar_h > 0) {
-      draw_status_bar_(it);
-    }
-    // Kein fill() mehr bei Transitions! Jedes Tile übermalt seinen
-    // Bereich selbst komplett (inkl. SCREEN_BACKGROUND für Ecken/Gaps).
-    // Das eliminiert den sichtbaren "schwarzen Blitz".
+    const uint32_t t0 = millis();
     if (this->was_fullscreen_ && !this->dashboard_.is_fullscreen()) {
       this->was_fullscreen_ = false;
     }
     if (!this->was_fullscreen_ && this->dashboard_.is_fullscreen()) {
       this->was_fullscreen_ = true;
     }
-    this->dashboard_.consume_page_changed();
+    if (this->dashboard_.consume_page_changed()) {
+    }
+#ifdef USE_ESP32
+    const size_t heap0 = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    const size_t psram0 = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+#endif
     this->dashboard_.draw(it);
+    const uint32_t dt = millis() - t0;
+#ifdef USE_ESP32
+    const long heap_d = (long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL) - (long)heap0;
+    const long psram_d = (long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM) - (long)psram0;
+    ESP_LOGI(TAG, "render_() %ums fs=%s page=%u tiles=%u heap=%+ld psram=%+ld",
+             dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
+             this->dashboard_.active_page(),
+             (unsigned)this->dashboard_.visible_tile_count(),
+             heap_d, psram_d);
+#else
+    ESP_LOGI(TAG, "render_() %ums fs=%s page=%u tiles=%u",
+             dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
+             this->dashboard_.active_page(),
+             (unsigned)this->dashboard_.visible_tile_count());
+#endif
   }
 
   // Effektive Status-Bar-Höhe: nur wenn mehrere Seiten vorhanden
@@ -383,9 +432,12 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
   int status_bar_height_{16};
 
   static constexpr int SWIPE_THRESHOLD = 50;
+  static constexpr int TAP_THRESHOLD = 20;
+  static constexpr int TAP_THRESHOLD_SQ = TAP_THRESHOLD * TAP_THRESHOLD;
 
   bool context_ready_{false};
   bool was_fullscreen_{false};
+  bool initial_render_pending_{true};
   bool last_touch_valid_{false};
   bool swipe_possible_{false};
   bool status_bar_tap_{false};

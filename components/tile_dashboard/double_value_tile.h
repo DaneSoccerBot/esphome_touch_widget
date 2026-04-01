@@ -66,6 +66,8 @@ public:
     void set_top_value(float v) { top_value_ = v; request_redraw(); }
     void set_bottom_value(float v) { bottom_value_ = v; request_redraw(); }
 
+    const char *tile_type_name() const override { return "DoubleValue"; }
+
 protected:
     void render_update(Display &it) override
     {
@@ -150,6 +152,8 @@ private:
     std::string top_label_, bottom_label_;
     std::string top_unit_, bottom_unit_;
     std::string fmt_top_, fmt_bottom_;
+    void reset_prev_values() override { prev_top_ = NAN; prev_bottom_ = NAN; }
+
     float prev_top_,  prev_bottom_;
 
     std::tuple<int, int, int, int> top_value_clip() const

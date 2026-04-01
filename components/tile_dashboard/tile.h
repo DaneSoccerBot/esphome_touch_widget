@@ -14,6 +14,11 @@
 #include "colors.h"
 #include "display_context.h"
 #include "tile_bg_renderer.h"
+#include "pixel_buffer.h"
+
+#ifdef USE_ESP32
+#include "esp_heap_caps.h"
+#endif
 
 using esphome::display::Display;
 
@@ -70,7 +75,11 @@ public:
     const int idx = tile_index();
     if (idx < static_cast<int>(ctx_.cache_value.size()))
       ctx_.cache_value[idx].clear();
+    force_full_ = true;
+    reset_prev_values();
   }
+
+  virtual void reset_prev_values() {}
 
   void draw(Display &it)
   {
@@ -84,8 +93,9 @@ public:
     if (idx < ctx_.cache_value.size())
       old_key = ctx_.cache_value[idx];
 
-    // 2) Initial, wenn alter Key leer; sonst nur redraw, wenn Key sich ändert
-    const bool is_initial = old_key.empty();
+    // 2) Initial wenn Key leer ODER force_full_ gesetzt (Page-Switch/Zoom-Exit)
+    const bool is_initial = old_key.empty() || force_full_;
+    if (force_full_) force_full_ = false;
     const bool need_redraw = is_initial || (old_key != new_key);
 
     if (!need_redraw)
@@ -101,11 +111,32 @@ public:
 
     if (is_initial)
     {
+#ifdef USE_ESP32
+      const size_t psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+#endif
+      const uint32_t t0 = esphome::millis();
       render_full(it);
+      const uint32_t dt = esphome::millis() - t0;
+#ifdef USE_ESP32
+      const long psram_delta = (long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM) - (long)psram_before;
+      ESP_LOGI("tile", "FULL %s[%d] @%d,%d %ums fs=%s %dx%d psram=%+ld",
+               tile_type_name(), idx, col_, row_, dt,
+               is_fullscreen() ? "Y" : "N",
+               tile_w(), tile_h(), psram_delta);
+#else
+      ESP_LOGI("tile", "FULL %s[%d] @%d,%d %ums fs=%s %dx%d",
+               tile_type_name(), idx, col_, row_, dt,
+               is_fullscreen() ? "Y" : "N",
+               tile_w(), tile_h());
+#endif
     }
     else
     {
+      const uint32_t t0 = esphome::millis();
       render_update(it);
+      const uint32_t dt = esphome::millis() - t0;
+      ESP_LOGD("tile", "UPD  %s[%d] @%d,%d %ums",
+               tile_type_name(), idx, col_, row_, dt);
     }
 
     // 6) Cache aktualisieren
@@ -122,6 +153,16 @@ public:
 
   virtual void dispatch_touch(uint16_t local_x, uint16_t local_y)
   {
+    // Touch-down: keine Actions auslösen — erst bei Release (nach Swipe-Check)
+  }
+
+  virtual void dispatch_touch_update(uint16_t local_x, uint16_t local_y)
+  {
+  }
+
+  virtual void dispatch_touch_release(uint16_t local_x, uint16_t local_y)
+  {
+    // Touch-Handler erst bei Release auslösen (Swipe wurde bereits geprüft)
     TouchArea a = TouchArea::CENTER;
     if (local_x < tile_w() * 0.33f)
       a = TouchArea::LEFT;
@@ -132,16 +173,6 @@ public:
       it = touch_.find(TouchArea::ANY);
     if (it != touch_.end())
       it->second();
-  }
-
-  virtual void dispatch_touch_update(uint16_t local_x, uint16_t local_y)
-  {
-
-  }
-
-  virtual void dispatch_touch_release(uint16_t local_x, uint16_t local_y)
-  {
-
   }
 
 protected:
@@ -189,23 +220,51 @@ protected:
     int x0 = abs_x(), y0 = abs_y();
     int w = tile_w(), h = tile_h();
     it.start_clipping(x0, y0, x0 + w, y0 + h);
-    // Im Fullscreen die große Hintergrundfüllung überspringen —
-    // render_background + draw_content decken den Bereich komplett ab
-    if (!is_fullscreen()) {
-      it.filled_rectangle(x0, y0, w, h, Colors::SCREEN_BACKGROUND);
-    }
-    render_background(it);
+    uint32_t t0 = esphome::millis();
+
+    // Hintergrund via PixelBuffer blitten (1 DMA pro Strip statt per-pixel)
+    const uint16_t c_scr = PixelBuffer::to_565(Colors::SCREEN_BACKGROUND);
+    const uint16_t c_brd = PixelBuffer::to_565(Colors::TILE_BORDER);
+    const uint16_t c_bg  = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+    const int gap = is_fullscreen() ? 0 : 2;
+    const int bw  = is_fullscreen() ? 0 : 1;
+    const int inset = gap + bw;
+
+    bg_buf().blit_strips(it, x0, y0, w, h, w * 32,
+        c_scr,
+        [&](PixelBuffer &buf, int strip_y) {
+          // Buffer ist bereits mit c_scr gefüllt (margin)
+          // Border-Bereich
+          const int sh = buf.height();
+          for (int sy = 0; sy < sh; sy++) {
+            int gy = strip_y + sy;
+            if (gy < gap || gy >= h - gap) continue;
+            if (gy < inset || gy >= h - inset) {
+              // Ganze Border-Zeile
+              buf.fill_rect(gap, sy, w - 2 * gap, 1, c_brd);
+            } else {
+              // Links border + BG + rechts border
+              buf.fill_rect(gap, sy, bw, 1, c_brd);
+              buf.fill_rect(inset, sy, w - 2 * inset, 1, c_bg);
+              buf.fill_rect(w - inset, sy, bw, 1, c_brd);
+            }
+          }
+        });
+
+    uint32_t t1 = esphome::millis();
     draw_labels(it);
+    uint32_t t2 = esphome::millis();
     draw_content(it);
     it.end_clipping();
+    uint32_t t3 = esphome::millis();
+    ESP_LOGI("tile", "  breakdown %s[%d]: bg_blit=%u lbl=%u content=%u ms",
+             tile_type_name(), tile_idx_, t1 - t0, t2 - t1, t3 - t2);
   }
   virtual void render_update(Display &it)
   {
     auto [cx0, cy0, cx1, cy1] = value_clip();
     it.start_clipping(cx0, cy0, cx1, cy1);
-    // nur Hintergrund-Farbe (nicht voller Rahmen!)
-    ctx_.bg_renderer.drawBgColor(it,
-                                 cx0, cy0, cx1 - cx0, cy1 - cy0);
+    clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
     draw_content(it);
     it.end_clipping();
   }
@@ -219,6 +278,7 @@ protected:
   }
   virtual void draw_content(Display &it) = 0;
   virtual std::string make_cache_key() const { return {}; }
+  virtual const char *tile_type_name() const { return "Tile"; }
 
   /**  *** NEU ***  Bereich, der bei Wert-Änderung neu gezeichnet werden soll.
        Default = komplette Kachel, Spezial-Tiles überschreiben es.            */
@@ -233,6 +293,13 @@ protected:
                          bool border = true,
                          int radius = 8) const
   {
+    // In Fullscreen: keine Rounded Corners, kein Border — nur plane Füllung.
+    // Rounded-Rects erzeugen 5× filled_rectangle + 4× filled_circle → teuer.
+    if (is_fullscreen()) {
+      it.filled_rectangle(abs_x(), abs_y(), tile_w(), tile_h(),
+                          Colors::TILE_BACKGROUND);
+      return;
+    }
     ctx_.bg_renderer.drawFullBg(it, abs_x(), abs_y(),
                                 tile_w(), tile_h(), numTilesY_,
                                 rounded ? radius : 0, border);
@@ -254,10 +321,33 @@ protected:
   std::string label2_;
   Display *disp_{nullptr};
   bool fullscreen_enabled_{false};
-  std::optional<OverrideGeometry> override_geo_; 
+  std::optional<OverrideGeometry> override_geo_;
+
+public:
+  /** Shared PixelBuffer für Hintergrund-Rendering (alle Tiles teilen sich einen). */
+  static PixelBuffer &bg_buf() {
+    static PixelBuffer buf;
+    return buf;
+  }
+protected:
+
+  /**
+   * Schnelles Flächen-Clear via blit_strips statt filled_rectangle.
+   * filled_rectangle = per-pixel PSRAM-Writes (4.8μs/px).
+   * blit_strips = RAM-Fill + 1 DMA pro Strip (~15× schneller).
+   */
+  void clear_area_fast(Display &it, int x, int y, int w, int h) {
+    const uint16_t c_bg = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+    bg_buf().blit_strips(it, x, y, w, h, w * 32,
+        c_bg, [](PixelBuffer &, int) {});
+  }
 
   void request_redraw() {
-    invalidate_cache();
+    // Nur Flag setzen — KEIN invalidate_cache()!
+    // Der Cache-Key ändert sich durch die State-Änderung (z.B. "OFF"→"ON"),
+    // was draw() automatisch als render_update() (statt render_full()) erkennt.
+    // invalidate_cache() würde den Key leeren → is_initial=true → render_full()
+    // → sichtbarer Background-Blackout + unnötige Arbeit.
     redraw_pending_ = true;
   }
 
@@ -270,6 +360,7 @@ public:
 
 private:
   bool redraw_pending_{false};
+  bool force_full_{false};
   std::map<TouchArea, std::function<void()>> touch_;
 };
 #endif

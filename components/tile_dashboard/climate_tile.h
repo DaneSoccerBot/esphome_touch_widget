@@ -65,30 +65,38 @@ public:
     parse_payload_(s);
   }
 
-  void dispatch_touch_update(uint16_t local_x, uint16_t local_y) override
-  {
-    handle_touch(local_x, local_y, false);
-  }
-
   void dispatch_touch(uint16_t local_x, uint16_t local_y) override
   {
-    handle_touch(local_x, local_y, false);
+    // Touch-Down merken für Tap-Erkennung (keine Aktion bei Touch-Down)
+    touch_down_x_ = local_x;
+    touch_down_y_ = local_y;
+  }
+
+  void dispatch_touch_update(uint16_t local_x, uint16_t local_y) override
+  {
+    // Kein Live-Drag — Temp-Verstellung nur per Tap-Release nah am Arc
   }
 
   void dispatch_touch_release(uint16_t local_x, uint16_t local_y) override
   {
-    handle_touch(local_x, local_y, true);
+    // Nur bei echtem Tap (Touch-Down nah an Touch-Up)
+    const int tdx = int(local_x) - int(touch_down_x_);
+    const int tdy = int(local_y) - int(touch_down_y_);
+    if (tdx * tdx + tdy * tdy > TAP_MAX_DIST_SQ) {
+      ESP_LOGD("Climate", "Touch rejected: too far from down (%d,%d)->(%d,%d)",
+               touch_down_x_, touch_down_y_, local_x, local_y);
+      return;
+    }
+    handle_touch(local_x, local_y);
   }
 
-  void handle_touch(uint16_t local_x, uint16_t local_y, bool is_touch_release)
+  void handle_touch(uint16_t local_x, uint16_t local_y)
   {
-    ESP_LOGD("Climate", "Touch handler override at local_x=%d and local_y=%d", local_x, local_y);
+    // --- Mode-Toggle: Tap in die Mitte ---
     const auto modeChangeArea = std::tuple<int, int, int, int>{tile_w() * 0.3f, tile_h() * 0.28f, tile_w() * 0.7f, tile_h() * 0.62f};
     auto [left, top, right, bottom] = modeChangeArea;
-    // ESP_LOGD("Climate", "Mode-Area: left=%d, top=%d, right=%d, bottom=%d", left, top, right, bottom);
-    //  disp_->filled_rectangle(abs_x()+left, abs_y()+top, right-left, bottom-top, Colors::RED);
 
-    if (is_touch_release && local_x >= left && local_x <= right &&
+    if (local_x >= left && local_x <= right &&
         local_y >= top && local_y <= bottom)
     {
       ESP_LOGD("Climate", "Mode-Area touched → toggle_mode()");
@@ -96,74 +104,62 @@ public:
       return;
     }
 
-    // --- Touch relativ zur Tile-Mitte wie gehabt ---
+    // --- Geometrie des Kreisbogens ---
     const float cx = float(tile_w()) * 0.5f;
     const float cy = float(tile_h()) * 0.47f;
+    const int size = std::min(tile_w(), tile_h()) * 80 / 100;
+    const int radius = size / 2;
+    const int thick = std::max(4, int(size * 0.09f));
+    const float arc_r = float(radius - thick / 2);
+
+    // Distanz zum Arc-Zentrum
     const float dx = float(local_x) - cx;
     const float dy = float(local_y) - cy;
+    const float dist = std::sqrt(dx * dx + dy * dy);
 
-    // Winkel in Grad (0° = rechts, 90° = unten) auf [0,360)
+    // Proximity-Check: Touch muss innerhalb ±30% der Bogendicke vom Arc-Radius sein
+    const float tolerance = std::max(float(thick) * 2.5f, 25.0f);
+    if (std::fabs(dist - arc_r) > tolerance) {
+      ESP_LOGD("Climate", "Touch rejected: dist=%.0f arc_r=%.0f tolerance=%.0f",
+               dist, arc_r, tolerance);
+      return;
+    }
+
+    // Winkel berechnen
     float angle = std::atan2(dy, dx) * 180.0f / M_PI;
     if (angle < 0)
       angle += 360.0f;
 
     const float start = 135.0f;
     const float span = 270.0f;
-    const float end = std::fmod(start + span, 360.0f); // non-constexpr, aber erlaubt
+    const float end = std::fmod(start + span, 360.0f);
 
-    // 1) prüfen, ob Winkel wirklich im Bogen liegt
-    bool in_arc;
-    if (start < end)
-    {
-      // Normal-Fall: bspw. start=30°, end=300° (hier nicht)
-      in_arc = (angle >= start && angle <= end);
-    }
-    else
-    {
-      // Wrap-Fall: Bogen von 135…360 und 0…45
-      in_arc = (angle >= start || angle <= end);
+    // Prüfen ob Winkel im Bogen liegt
+    bool in_arc = (angle >= start || angle <= end);
+    if (!in_arc) {
+      ESP_LOGD("Climate", "Touch rejected: angle=%.1f° outside arc", angle);
+      return;
     }
 
-    // 2) rel-Winkel innerhalb des Bogens berechnen oder clampen
-    float rel;
-    if (in_arc)
-    {
-      // Entfernung vom Start entlang des Bogens (auch über 360°)
-      rel = angle >= start
-                ? angle - start
-                : (angle + 360.0f) - start;
-      // sicherheitshalber clamp auf [0, span]
-      rel = std::clamp(rel, 0.0f, span);
-    }
-    else
-    {
-      // Winkel im Komplement (45…135) – an den nächstliegenden Endpunkt clampen
-      // Endpunktswinkel in [0,360): start=135, end=45
-      float d_start = std::fabs(angle - start);
-      float d_end = std::fabs(
-          // falls angle > start, nimm angle-360, um 45<–>360+45-Abstand zu messen
-          angle > start
-              ? (angle - 360.0f) - end
-              : angle - end);
-      rel = (d_start < d_end) ? 0.0f : span;
-    }
+    // Rel-Winkel berechnen
+    float rel = (angle >= start) ? angle - start : (angle + 360.0f) - start;
+    rel = std::clamp(rel, 0.0f, span);
 
-    // 3) Prozent 0…1 und rohe Temperatur
+    // Temperatur berechnen + quantisieren
     float prog = rel / span;
     float raw_target = cache_.min_t + prog * (cache_.max_t - cache_.min_t);
-
-    // 4) Quantisierung auf step-Raster
     float steps = std::round((raw_target - cache_.min_t) / cache_.step);
     float quantized = cache_.min_t + steps * cache_.step;
     quantized = std::clamp(quantized, cache_.min_t, cache_.max_t);
 
     ESP_LOGD("Climate",
-             "Touch→angle=%.1f°, in_arc=%d, rel=%.1f°, prog=%.2f → quant=%.1f°C, is_touch_release =%d",
-             angle, int(in_arc), rel, prog, quantized, is_touch_release);
+             "Touch→angle=%.1f°, dist=%.0f, prog=%.2f → quant=%.1f°C",
+             angle, dist, prog, quantized);
 
-    // 5) Wert setzen (macht nur API-Call, wenn sich quantized ändert)
-    set_target_temp(quantized, is_touch_release);
+    set_target_temp(quantized, true);
   }
+
+  const char *tile_type_name() const override { return "Climate"; }
 
 protected:
   void render_update(Display &it) override
@@ -180,9 +176,7 @@ protected:
     {
       auto [cx0, cy0, cx1, cy1] = current_temp_clip();
       it.start_clipping(cx0, cy0, cx1, cy1);
-      // nur Hintergrund-Farbe (nicht voller Rahmen!)
-      ctx_.bg_renderer.drawBgColor(it,
-                                   cx0, cy0, cx1 - cx0, cy1 - cy0);
+      clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
       draw_current_temp_label(it);
       it.end_clipping();
       return;
@@ -190,9 +184,7 @@ protected:
 
     auto [cx0, cy0, cx1, cy1] = value_clip();
     it.start_clipping(cx0, cy0, cx1, cy1);
-    // nur Hintergrund-Farbe (nicht voller Rahmen!)
-    ctx_.bg_renderer.drawBgColor(it,
-                                 cx0, cy0, cx1 - cx0, cy1 - cy0);
+    clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
     draw_content(it);
     it.end_clipping();
   }
@@ -231,9 +223,10 @@ protected:
     // Auf ESP32 den PixelBuffer auf max ~64KB (256x128) begrenzen,
     // damit PSRAM-Allokation + DMA-Transfer schnell bleibt
     static constexpr int MAX_BUF_PIXELS = 256 * 128;
-    const bool use_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS) && arc_buf_.ensure(buf_w, buf_h);
+    const bool fits_in_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS);
 
-    if (use_buffer) {
+    if (fits_in_buffer && arc_buf_.ensure(buf_w, buf_h)) {
+      // --- Normaler Single-Buffer-Pfad (kleinere Arcs im Grid) ---
       const int buf_x = cx - extent;
       const int buf_y = cy - extent;
       const int bcx = cx - buf_x;
@@ -261,23 +254,45 @@ protected:
 
       arc_buf_.blit(it, buf_x, buf_y);
     } else {
-      // Fallback: direkte Methode wenn Buffer zu groß / Allokation fehlschlägt
-      // Weniger Segmente um DMA-Transfers zu reduzieren
-      const int segments = std::min(100, std::max(30, radius / 3));
-      for (int i = 0; i < segments; i++) {
-        float deg = start + i * (span / segments);
-        float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
-        int px = cx + std::cos(rad_f) * (radius - thick / 2);
-        int py = cy + std::sin(rad_f) * (radius - thick / 2);
-        it.filled_circle(px, py, br,
-                         (deg <= start + filled) ? Colors::ORANGE : Colors::LIGHT_GREY);
-      }
-      if (!std::isnan(tgt)) {
-        float mrad = (start + filled) * static_cast<float>(M_PI) / 180.0f;
-        it.filled_circle(cx + std::cos(mrad) * (radius - thick / 2),
-                         cy + std::sin(mrad) * (radius - thick / 2),
-                         br + 2, esphome::Color::WHITE);
-      }
+      // --- Strip-basierter Fallback: Arc in horizontale Streifen aufteilen ---
+      const int buf_x = cx - extent;
+      const int buf_y = cy - extent;
+      const int bcx_base = cx - buf_x;
+      const int bcy_base = cy - buf_y;
+
+      const uint16_t bg565 = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+      const uint16_t c_orange = PixelBuffer::to_565(Colors::ORANGE);
+      const uint16_t c_grey = PixelBuffer::to_565(Colors::LIGHT_GREY);
+      const uint16_t c_white = PixelBuffer::to_565(esphome::Color::WHITE);
+      const float filled_val = filled;
+      const int arc_radius = radius;
+      const int arc_thick = thick;
+      const int arc_br = br;
+
+      arc_buf_.blit_strips(it, buf_x, buf_y, buf_w, buf_h, MAX_BUF_PIXELS, bg565,
+        [&](PixelBuffer &strip, int y_off) {
+          // Zeichne alle Track-Kreise die in diesen Streifen fallen
+          for (int i = 0; i < 100; i++) {
+            float deg = start + i * (span / 100);
+            float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
+            int px = bcx_base + std::cos(rad_f) * (arc_radius - arc_thick / 2);
+            int py = bcy_base + std::sin(rad_f) * (arc_radius - arc_thick / 2) - y_off;
+            // Nur zeichnen wenn der Kreis diesen Streifen berührt
+            if (py + arc_br >= 0 && py - arc_br < strip.height()) {
+              strip.filled_circle(px, py, arc_br,
+                                  (deg <= start + filled_val) ? c_orange : c_grey);
+            }
+          }
+          // Marker
+          if (!std::isnan(tgt)) {
+            float mrad = (start + filled_val) * static_cast<float>(M_PI) / 180.0f;
+            int mx = bcx_base + std::cos(mrad) * (arc_radius - arc_thick / 2);
+            int my = bcy_base + std::sin(mrad) * (arc_radius - arc_thick / 2) - y_off;
+            if (my + (arc_br + 2) >= 0 && my - (arc_br + 2) < strip.height()) {
+              strip.filled_circle(mx, my, arc_br + 2, c_white);
+            }
+          }
+        });
     }
     // Zahlen/Text
     char buf[16];
@@ -429,10 +444,10 @@ private:
     // 1) Clamp auf min/max
     float new_t = std::clamp(t, cache_.min_t, cache_.max_t);
 
-    // 3) State updaten, redraw und Service-Call
+    // 3) State updaten + Payload publishen (synced alle Tiles mit gleichem Sensor)
     cache_.target = new_t;
     ESP_LOGD("Climate", "Setting target to %.1f", cache_.target);
-    request_redraw();
+    publish_state_to_payload_();
     if (!is_touch_release)
       return;
     // 2) Nur weitermachen, wenn sich der Wert wirklich ändert
@@ -446,6 +461,7 @@ private:
     ESP_LOGD("Climate", "Sending target %.1f to Home Assistant", cache_.target);
     api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);
     call.set_service("climate.set_temperature");
+    call.init_data(2);
     call.add_data("entity_id", cfg_.entity_id);
     call.add_data("temperature", esphome::to_string(cache_.target));
     call.play();
@@ -461,12 +477,41 @@ private:
     const std::string next = *it;
     cache_.mode = next;
     ESP_LOGD("Climate", "Toggling mode to %s", next.c_str());
-    request_redraw();
+    publish_state_to_payload_();
     api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);
     call.set_service("climate.set_hvac_mode");
+    call.init_data(2);
     call.add_data("entity_id", cfg_.entity_id);
     call.add_data("hvac_mode", next);
     call.play();
+  }
+
+  // Max Distanz (px²) zwischen Touch-Down und Touch-Up für einen gültigen Tap
+  static constexpr int TAP_MAX_DIST = 25;
+  static constexpr int TAP_MAX_DIST_SQ = TAP_MAX_DIST * TAP_MAX_DIST;
+  uint16_t touch_down_x_{0}, touch_down_y_{0};
+
+  /* ---------- Payload zurück-publizieren (synced alle Tiles) ---------- */
+  void publish_state_to_payload_()
+  {
+    if (cfg_.payload == nullptr)
+      return;
+    char buf[256];
+    // Modes-Array aufbauen
+    std::string modes_json = "[";
+    for (size_t i = 0; i < cache_.modes.size(); i++) {
+      if (i > 0) modes_json += ",";
+      modes_json += "\"" + cache_.modes[i] + "\"";
+    }
+    modes_json += "]";
+    std::snprintf(buf, sizeof(buf),
+      "{\"temperature\":%.1f,\"current_temperature\":%.1f,"
+      "\"min_temp\":%.0f,\"max_temp\":%.0f,\"target_temp_step\":%.1f,"
+      "\"mode\":\"%s\",\"hvac_modes\":%s}",
+      cache_.target, cache_.current,
+      cache_.min_t, cache_.max_t, cache_.step,
+      cache_.mode.c_str(), modes_json.c_str());
+    cfg_.payload->publish_state(std::string(buf));
   }
 
   /* ---------- Member ---------- */

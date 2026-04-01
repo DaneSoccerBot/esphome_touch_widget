@@ -42,6 +42,8 @@ public:
     request_redraw();
   }
 
+  const char *tile_type_name() const override { return "Battery"; }
+
 protected:
   void render_update(Display &it) override
   {
@@ -135,6 +137,8 @@ private:
       this->level_ = value;
       this->request_redraw(); });
   }
+
+  void reset_prev_values() override { prev_val_ = NAN; }
 
   Cfg cfg_;
   float level_{-1.0f};

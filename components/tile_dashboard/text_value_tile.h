@@ -46,6 +46,8 @@ public:
     request_redraw();
   }
 
+  const char *tile_type_name() const override { return "TextValue"; }
+
 protected:
   // ----- Inhalt zeichnen -----------------------------------------------------
   void draw_content(Display &it) override {

@@ -79,7 +79,8 @@ public:
     for(auto &t:tiles_){
       if (t->page() == active_page_) t->draw(it);
     }
-    if (num_pages() > 1) draw_page_indicator_(it);
+    // Status-Bar + Page-Indicator immer zeichnen (via blit_strips, flackerfrei)
+    if (num_pages() > 1) draw_status_bar_with_indicator_(it);
   }
 
   /** Prüft ob ein Tile ein Redraw-Flag hat und konsumiert es. */
@@ -91,13 +92,30 @@ public:
     return any;
   }
 
+  size_t visible_tile_count() const {
+    if (focused_tile_) return 1;
+    size_t n = 0;
+    for (auto &t : tiles_) { if (t->page() == active_page_) ++n; }
+    return n;
+  }
+
   void clear(){ tiles_.clear(); focused_tile_ = nullptr; active_page_ = 0; }
 
   // --- Fullscreen ---
   bool is_fullscreen() const { return focused_tile_ != nullptr; }
 
+  /** Erstes Tile der aktuellen Page (für Scene-Control). */
+  Tile *first_tile_on_page() {
+    for (auto &t : tiles_) {
+      if (t->page() == active_page_) return t.get();
+    }
+    return nullptr;
+  }
+
   void enter_fullscreen(Tile *t) {
     focused_tile_ = t;
+    // Nur das fokussierte Tile invalidieren (Cache-Key ändert sich durch neue Geometrie)
+    t->invalidate_cache();
     // Fullscreen nutzt die gesamte physische Display-Fläche
     t->set_override_geometry({ctx_.x0, ctx_.y0 - ctx_.status_bar_h,
                               ctx_.scr_w, ctx_.display_h});
@@ -105,8 +123,12 @@ public:
 
   void exit_fullscreen() {
     if (focused_tile_ == nullptr) return;
+    // Nur das vorher fokussierte Tile invalidieren
+    focused_tile_->invalidate_cache();
     focused_tile_->clear_override_geometry();
     focused_tile_ = nullptr;
+    // Alle Grid-Tiles invalidieren, da sie beim Fullscreen-Eintritt
+    // verdeckt wurden und neu gezeichnet werden müssen
     invalidate_all_();
   }
 
@@ -123,6 +145,7 @@ public:
     if (page >= num_pages() || page == active_page_) return false;
     active_page_ = page;
     page_changed_ = true;
+    indicator_dirty_ = true;
     invalidate_all_();
     return true;
   }
@@ -148,14 +171,18 @@ public:
   // --- Touch dispatch ---
   void dispatch_touch(uint8_t col,uint8_t row,uint16_t local_x,uint16_t local_y){
     if (focused_tile_ != nullptr) {
-      if (close_button_hit_(local_x, local_y)) { exit_fullscreen(); return; }
+      if (close_button_hit_(local_x, local_y)) { pending_close_ = true; return; }
       focused_tile_->dispatch_touch(local_x, local_y);
       return;
     }
     for(auto &t:tiles_){
       if(t->page() == active_page_ && t->contains_cell(col, row)){
         const auto [tlx, tly] = span_local_(t.get(), col, row, local_x, local_y);
-        if (t->fullscreen_enabled()) { enter_fullscreen(t.get()); return; }
+        if (t->fullscreen_enabled() && !tile_fills_page_(t.get())) {
+          // Fullscreen NICHT bei touch-down — erst bei release (nach Swipe-Check)
+          pending_fullscreen_tile_ = t.get();
+          return;
+        }
         t->dispatch_touch(tlx, tly);
         break;
       }
@@ -167,6 +194,9 @@ public:
       focused_tile_->dispatch_touch_update(local_x, local_y);
       return;
     }
+    // Keine Touch-Updates weiterleiten solange Fullscreen-Eintritt pending ist
+    // (Swipe-Geste ist noch nicht entschieden)
+    if (pending_fullscreen_tile_ != nullptr) return;
     for(auto &t:tiles_){
       if(t->page() == active_page_ && t->contains_cell(col, row)){
         const auto [tlx, tly] = span_local_(t.get(), col, row, local_x, local_y);
@@ -177,6 +207,19 @@ public:
   }
 
   void dispatch_touch_release(uint8_t col,uint8_t row,uint16_t local_x,uint16_t local_y){
+    // Pending close-button (deferred from touch-down)
+    if (pending_close_) {
+      pending_close_ = false;
+      exit_fullscreen();
+      return;
+    }
+    // Pending fullscreen entry (deferred from touch-down to allow swipe detection)
+    if (pending_fullscreen_tile_ != nullptr) {
+      Tile *t = pending_fullscreen_tile_;
+      pending_fullscreen_tile_ = nullptr;
+      enter_fullscreen(t);
+      return;
+    }
     if (focused_tile_ != nullptr) {
       focused_tile_->dispatch_touch_release(local_x, local_y);
       return;
@@ -189,6 +232,9 @@ public:
       }
     }
   }
+
+  /** Cancel pending fullscreen (called when swipe is detected). */
+  void cancel_pending_fullscreen() { pending_fullscreen_tile_ = nullptr; }
   
 private:
   static constexpr int CLOSE_BTN_SIZE = 40;
@@ -202,6 +248,12 @@ private:
   void apply_page_grid_(uint8_t page) {
     auto [c, r] = page_grid(page);
     ctx_.apply_page_grid(c, r);
+  }
+
+  /** Prüft ob ein Tile die gesamte Page belegt (colspan×rowspan == grid). */
+  bool tile_fills_page_(const Tile *t) const {
+    auto [c, r] = page_grid(t->page());
+    return t->colspan() >= c && t->rowspan() >= r;
   }
 
   /** Convert cell-local coordinates to tile-local coordinates for spanning tiles. */
@@ -252,11 +304,53 @@ private:
     }
   }
 
+  /** Status-Bar + Page-Indicator atomar via blit_strips zeichnen (flackerfrei). */
+  void draw_status_bar_with_indicator_(Display &it) {
+    const int bar_x = ctx_.x0;
+    const int bar_y = ctx_.y0 - ctx_.status_bar_h;
+    const int bar_w = ctx_.scr_w;
+    const int bar_h = ctx_.status_bar_h;
+    if (bar_h <= 0 || bar_w <= 0) return;
+
+    // Page-Indicator Dot-Positionen berechnen
+    const uint8_t np = num_pages();
+    const int total_dot_w = np * DOT_RADIUS * 2 + (np - 1) * (DOT_SPACING - DOT_RADIUS * 2);
+    const int dot_start_x = (bar_w - total_dot_w) / 2;
+    const int dot_cy = bar_h / 2;  // vertikal zentriert in der Bar
+
+    const uint16_t c_bg = PixelBuffer::to_565(esphome::Color::BLACK);
+    const uint16_t c_active = PixelBuffer::to_565(Colors::NORMAL_TEXT);
+    const uint16_t c_inactive = PixelBuffer::to_565(Colors::TILE_BORDER);
+
+    auto &buf = Tile::bg_buf();
+    buf.blit_strips(it, bar_x, bar_y, bar_w, bar_h, bar_w * bar_h,
+        c_bg,
+        [&](PixelBuffer &b, int strip_y) {
+          const int sh = b.height();
+          for (int sy = 0; sy < sh; sy++) {
+            int gy = strip_y + sy;  // y relativ zur Bar-Oberkante
+            // Dots zeichnen
+            for (uint8_t i = 0; i < np; i++) {
+              int dcx = dot_start_x + i * DOT_SPACING + DOT_RADIUS;
+              int dy = gy - dot_cy;
+              if (dy * dy <= DOT_RADIUS * DOT_RADIUS) {
+                int dx_max = (int)std::sqrt((float)(DOT_RADIUS * DOT_RADIUS - dy * dy));
+                uint16_t col = (i == active_page_) ? c_active : c_inactive;
+                b.fill_rect(dcx - dx_max, sy, dx_max * 2 + 1, 1, col);
+              }
+            }
+          }
+        });
+  }
+
   DisplayContext &ctx_;
   std::vector<std::unique_ptr<Tile>> tiles_;
   Tile *focused_tile_{nullptr};
+  Tile *pending_fullscreen_tile_{nullptr};
+  bool pending_close_{false};
   uint8_t active_page_{0};
   bool page_changed_{false};
+  bool indicator_dirty_{true};
 };
 
 // Singleton ------------------------------------------------------------------

@@ -1,3 +1,14 @@
+# ============================================================================
+# Hardware-Config: Guition ESP32-S3-4848S040 mit mipi_rgb Treiber
+# ============================================================================
+# mipi_rgb ersetzt den alten st7701s-Treiber und bietet:
+# - Dirty-Rect-basiertes Flushing (nur geänderte Bereiche → Panel)
+# - draw_pixel_at() schreibt in lokalen Buffer, nicht direkt aufs Panel
+# - update() flusht ein einziges Dirty-Rechteck
+#
+# ACHTUNG: Benötigt ESPHome >= 2025.12 (mipi_rgb + GUITION-4848S040 Preset)
+# ============================================================================
+
 i2c:
   - id: bus_a
     sda: GPIO19
@@ -31,7 +42,9 @@ output:
   - platform: ledc
     pin: GPIO38
     id: backlight
-    frequency: 100Hz
+    frequency: 150Hz
+    min_power: 0.01
+    zero_means_zero: true
 
 light:
   - platform: monochromatic
@@ -49,48 +62,14 @@ touchscreen:
   platform: gt911
   id: dashboard_touchscreen
   display: dashboard_display
-  transform:
-    mirror_x: true
-    mirror_y: true
 
 display:
-  - platform: st7701s
+  - platform: mipi_rgb
+    model: GUITION-4848S040
     id: dashboard_display
-    rotation: 0
-    # 'never' — alle Redraws explizit über display_->update() in touch/loop
     update_interval: never
     auto_clear_enabled: false
-    data_rate: 2MHz
-    spi_mode: MODE3
-    color_order: RGB
-    dimensions:
-      width: ${dashboard_width}
-      height: ${dashboard_height}
-    invert_colors: false
-    transform:
-      mirror_x: true
-      mirror_y: true
-    cs_pin: 39
+    # Reset-Pin über PCA9554 I/O-Expander (board-spezifisch)
     reset_pin:
       pca9554: p_c_a
       number: 5
-    de_pin: 18
-    hsync_pin: 16
-    vsync_pin: 17
-    pclk_pin: 21
-    init_sequence:
-      - 1
-      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x10]
-      - [0xCD, 0x00]
-    pclk_frequency: 12MHz
-    pclk_inverted: false
-    hsync_pulse_width: 8
-    hsync_front_porch: 10
-    hsync_back_porch: 20
-    vsync_pulse_width: 8
-    vsync_front_porch: 10
-    vsync_back_porch: 10
-    data_pins:
-      red: [11, 12, 13, 14, 0]
-      green: [8, 20, 3, 46, 9, 10]
-      blue: [4, 5, 6, 7, 15]

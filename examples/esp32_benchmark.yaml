@@ -1,0 +1,176 @@
+# ESP32 Benchmark — Rendering-Test ohne HA/WiFi
+# Flash: esphome run examples/esp32_benchmark.yaml --device /dev/cu.usbserial-21230
+substitutions:
+  device_name: esp32-benchmark
+  friendly_name: ESP32 Benchmark
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: DEBUG
+  dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
+  tile_dashboard_components_source: ../components
+  touch_rotation: "0"
+  dashboard_width: "480"
+  dashboard_height: "480"
+  climate_zone_a_entity: climate.benchmark_zone_a
+  climate_zone_b_entity: climate.benchmark_zone_b
+  climate_zone_a_label: ZONE A
+  climate_zone_b_label: ZONE B
+  light_switch_entity: switch.benchmark_light
+  switch_label: LIGHT
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  project:
+    name: ${project_name}
+    version: ${project_version}
+  includes:
+    - ../scripts/screenshot_helper.h
+
+logger:
+  level: ${logger_level}
+  hardware_uart: UART0
+
+# WiFi AP-Modus — kein Router nötig, nur damit API-Component kompiliert
+wifi:
+  ap:
+    ssid: "benchmark"
+
+api:
+
+external_components:
+  - source: ${tile_dashboard_components_source}
+    components: [tile_dashboard]
+    refresh: 0s
+
+packages:
+  hardware: !include ../packages/hardware/esp32s3_st7701_480_touch.yaml
+
+font:
+  - file: ${dashboard_font_file}
+    id: benchmark_bootstrap_font
+    size: 12
+    glyphs:
+      - "A"
+
+# --- Fake Sensor-Daten (wie Simulator) ---
+
+globals:
+  - id: sim_tick
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          id(sim_tick)++;
+  - interval: 200ms
+    then:
+      - lambda: |-
+          screenshot_helper::process_commands(id(dashboard_display), id(dashboard_ui).get_dashboard());
+
+sensor:
+  - platform: template
+    id: battery_percent
+    name: "${friendly_name} Battery"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 18;
+      const float ramp = phase <= 9 ? phase : 18 - phase;
+      return 34.0f + ramp * 6.0f;
+
+  - platform: template
+    id: energy_price
+    name: "${friendly_name} Energy Price"
+    accuracy_decimals: 2
+    update_interval: 1s
+    lambda: |-
+      const uint32_t step = id(sim_tick) % 12;
+      return 0.16f + 0.01f * step;
+
+text_sensor:
+  - platform: template
+    id: climate_zone_a_payload
+    name: "${friendly_name} Zone A Climate"
+    update_interval: 1s
+    lambda: |-
+      const float target = 20.0f + 0.5f * float(id(sim_tick) % 8);
+      const float current = 19.0f + 0.4f * float((id(sim_tick) + 2) % 8);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: climate_zone_b_payload
+    name: "${friendly_name} Zone B Climate"
+    update_interval: 1s
+    lambda: |-
+      const float target = 18.5f + 0.5f * float((id(sim_tick) + 3) % 6);
+      const float current = 18.0f + 0.3f * float((id(sim_tick) + 1) % 6);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"auto\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+switch:
+  - platform: template
+    id: dashboard_light_switch
+    name: "${friendly_name} Demo Light"
+    optimistic: true
+
+# --- Dashboard Layout: 2×2 mit allen Tile-Typen ---
+
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 2
+  rows: 2
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: ${dashboard_font_file}
+  tiles:
+    - type: climate
+      col: 1
+      row: 1
+      label: ${climate_zone_a_label}
+      payload: climate_zone_a_payload
+      entity_id: ${climate_zone_a_entity}
+      fullscreen: true
+
+    - type: climate
+      col: 2
+      row: 1
+      label: ${climate_zone_b_label}
+      payload: climate_zone_b_payload
+      entity_id: ${climate_zone_b_entity}
+      fullscreen: true
+
+    - type: switch
+      col: 1
+      row: 2
+      label: ${switch_label}
+      switch: dashboard_light_switch
+      entity_id: ${light_switch_entity}
+
+    - type: gauge
+      col: 2
+      row: 2
+      label: "BATTERY"
+      sensor: battery_percent
+      min_value: 0
+      max_value: 100
+      unit: "%"

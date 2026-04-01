@@ -73,8 +73,8 @@ def font_id_name(base_id, size):
 
 def build_font_config(component_id, font_file, glyphs, size):
     base_id = component_base_id(component_id)
-    glyph_type = getattr(font, "GlyphData", cg.uint8)
-    cfg = {
+    glyph_type = getattr(font, "GlyphData", getattr(font, "Glyph", cg.uint8))
+    return {
         "id": ID(
             font_id_name(base_id, size),
             is_declaration=True,
@@ -82,7 +82,11 @@ def build_font_config(component_id, font_file, glyphs, size):
         ),
         "file": deepcopy(font_file),
         "size": size,
+        "bpp": 1,
         "glyphs": list(glyphs),
+        "glyphsets": [],
+        "extras": [],
+        "ignore_missing_glyphs": False,
         "raw_data_id": ID(
             f"{base_id}_font_data_{size}",
             is_declaration=True,
@@ -94,7 +98,6 @@ def build_font_config(component_id, font_file, glyphs, size):
             type=glyph_type,
         ),
     }
-    return font.CONFIG_SCHEMA(cfg)
 
 
 def build_font_configs(component_id, font_file, glyphs):

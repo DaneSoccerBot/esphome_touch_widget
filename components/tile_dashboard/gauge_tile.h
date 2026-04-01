@@ -55,6 +55,8 @@ public:
 
   void set_value(float v) { val_ = v; request_redraw(); }
 
+  const char *tile_type_name() const override { return "Gauge"; }
+
 protected:
   void render_update(Display &it) override
   {
@@ -77,7 +79,7 @@ protected:
     {
       auto [cx0, cy0, cx1, cy1] = gauge_value_clip();
       it.start_clipping(cx0, cy0, cx1, cy1);
-      ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
+      clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
       // Geometrie
       float radius = w * 0.42f;
       float thickness = radius * 0.4f;
@@ -110,31 +112,36 @@ protected:
 
       // Auf ESP32 den PixelBuffer auf max ~64KB begrenzen
       static constexpr int MAX_BUF_PIXELS = 256 * 128;
-      const bool use_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS) && arc_buf_.ensure(buf_w, buf_h);
+      const bool fits_in_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS);
 
-      if (use_buffer) {
+      if (fits_in_buffer && arc_buf_.ensure(buf_w, buf_h)) {
         arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
-        arc_buf_.filled_arc(bcx, bcy, radius, inner_radius,
-                            start_angle, start_angle + angle_range,
-                            PixelBuffer::to_565(Colors::SCREEN_BACKGROUND));
-
-        arc_buf_.filled_arc(bcx, bcy, radius, inner_radius,
-                            start_angle, filled_angle,
-                            PixelBuffer::to_565(fill_color));
-
-        arc_buf_.filled_circle(bcx, bcy, static_cast<int>(inner_radius),
-                               PixelBuffer::to_565(Colors::TILE_BACKGROUND));
+        // Kombinierter Single-Pass: Track + Fill + Inner Circle
+        arc_buf_.draw_gauge_arc(bcx, bcy, radius, inner_radius,
+                                start_angle, start_angle + angle_range,
+                                filled_angle,
+                                PixelBuffer::to_565(Colors::SCREEN_BACKGROUND),
+                                PixelBuffer::to_565(fill_color),
+                                PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
         arc_buf_.blit(it, buf_x, buf_y);
       } else {
-        // Fallback: direkt zeichnen
-        draw_arc_segment(it, cx, cy, radius, inner_radius,
-                         start_angle, start_angle + angle_range,
-                         Colors::SCREEN_BACKGROUND);
-        draw_arc_segment(it, cx, cy, radius, inner_radius,
-                         start_angle, filled_angle, fill_color);
-        it.filled_circle(cx, cy, inner_radius, Colors::TILE_BACKGROUND);
+        // Strip-basierter Fallback: kombinierter Single-Pass pro Strip
+        const uint16_t bg565 = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+        const uint16_t track565 = PixelBuffer::to_565(Colors::SCREEN_BACKGROUND);
+        const uint16_t fill565 = PixelBuffer::to_565(fill_color);
+        const float sa = start_angle, ea_full = start_angle + angle_range, ea_fill = filled_angle;
+        const float ir = inner_radius, or_ = radius;
+        const int bcx_l = bcx, bcy_l = bcy;
+
+        arc_buf_.blit_strips(it, buf_x, buf_y, buf_w, buf_h, MAX_BUF_PIXELS, bg565,
+          [&](PixelBuffer &strip, int y_off) {
+            const int shifted_cy = bcy_l - y_off;
+            strip.draw_gauge_arc(bcx_l, shifted_cy, or_, ir,
+                                 sa, ea_full, ea_fill,
+                                 track565, fill565, bg565);
+          });
       }
 
       it.end_clipping();
@@ -144,7 +151,7 @@ protected:
     {
       auto [cx0, cy0, cx1, cy1] = number_value_clip();
       it.start_clipping(cx0, cy0, cx1, cy1);
-      ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
+      clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
       // Wert-Text
       char buf_val[16], buf_all[16];
       std::snprintf(buf_val, sizeof(buf_val), fmt_.c_str(), value);
@@ -192,6 +199,8 @@ private:
   std::string unit_;
   std::string fmt_;
   Font *gauge_font_{nullptr};
+  void reset_prev_values() override { prev_val_ = NAN; prev_gauge_val_ = NAN; }
+
   float prev_val_{NAN};
   float prev_gauge_val_{NAN};
   PixelBuffer arc_buf_;

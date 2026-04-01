@@ -43,6 +43,8 @@ public:
             const Cfg &cfg)
       : LightTile(get_display_ctx(), col, row, std::move(label), cfg) {}
 
+  const char *tile_type_name() const override { return "Light"; }
+
 protected:
   bool is_on() const
   {
@@ -86,14 +88,16 @@ private:
     { // → Einschalten
       ESP_LOGD("Light", "Toggling lights ON");
       svc.set_service("light.turn_on");
+      svc.init_data(1);
       svc.add_data("entity_id", cfg_.entity_id);
-      //svc.add_data("brightness", "255");          // 255 = 100 %
+      //svc.add_data("brightness", "255");          // 255 = 100 %
       //svc.add_data("rgb_color", "[255,255,255]");      
     }
     else
     { // → Ausschalten
       ESP_LOGD("Light", "Toggling lights OFF");
       svc.set_service("light.turn_off");
+      svc.init_data(1);
       svc.add_data("entity_id", cfg_.entity_id);
     }
     svc.play();

@@ -33,7 +33,7 @@ FONT_FILE = {"path": "../assets/fonts/RobotoCondensed-Regular.ttf", "type": "loc
 class TileDashboardSchemaTests(unittest.TestCase):
     def setUp(self):
         self.old_config_path = CORE.config_path
-        CORE.config_path = str(ROOT / "examples/simulator_ha_2x2.yaml")
+        CORE.config_path = Path(ROOT / "examples/simulator_ha_2x2.yaml")
         self.addCleanup(setattr, CORE, "config_path", self.old_config_path)
 
     def base_config(self, tiles, **overrides):

@@ -203,6 +203,7 @@ async def _generate_fonts(config):
 async def to_code(config):
     CORE.loaded_integrations.add("font")
     cg.add_define("USE_TILE_DASHBOARD")
+    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
     for header in AUTO_INCLUDES:
         cg.add_global(cg.RawStatement(f'#include "{header}"'))
 

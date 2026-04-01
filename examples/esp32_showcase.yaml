@@ -1,0 +1,353 @@
+# ESP32 Showcase — 3 Pages mit Swipe, 3×3 Grid, großes Climate-Tile
+# Flash: esphome run examples/esp32_showcase.yaml --device /dev/cu.usbserial-21230
+substitutions:
+  device_name: esp32-showcase
+  friendly_name: ESP32 Showcase
+  project_name: esphome.touch_widget
+  project_version: "0.1.0-dev"
+  logger_level: DEBUG
+  dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
+  tile_dashboard_components_source: ../components
+  touch_rotation: "0"
+  dashboard_width: "480"
+  dashboard_height: "480"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  project:
+    name: ${project_name}
+    version: ${project_version}
+  includes:
+    - ../scripts/screenshot_helper.h
+
+logger:
+  level: ${logger_level}
+  hardware_uart: UART0
+
+wifi:
+  ap:
+    ssid: "showcase"
+
+api:
+
+external_components:
+  - source: ${tile_dashboard_components_source}
+    components: [tile_dashboard]
+    refresh: 0s
+
+packages:
+  hardware: !include ../packages/hardware/esp32s3_st7701_480_touch.yaml
+
+font:
+  - file: ${dashboard_font_file}
+    id: showcase_bootstrap_font
+    size: 12
+    glyphs:
+      - "A"
+
+# --- Fake Sensor-Daten ---
+
+globals:
+  - id: sim_tick
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+interval:
+  # Round-Robin: nur 1 Sensor pro Tick updaten (alle 2s im Kreis)
+  # → man sieht welches Tile gerade flackert / sich aktualisiert
+  - interval: 2s
+    then:
+      - lambda: |-
+          id(sim_tick)++;
+          // Round-Robin: 7 Sensoren abwechselnd einzeln updaten
+          switch (id(sim_tick) % 7) {
+            case 0: id(battery_percent).update(); break;
+            case 1: id(room_temperature).update(); break;
+            case 2: id(energy_price).update(); break;
+            case 3: id(solar_power).update(); break;
+            case 4: id(grid_load).update(); break;
+            case 5: id(humidity_sensor).update(); break;
+            case 6: id(demo_light_state).update(); break;
+          }
+          // Einmalig Climate-Payloads seeden (danach statisch)
+          static bool seeded = false;
+          if (!seeded) {
+            id(climate_zone_a_payload).update();
+            id(climate_zone_b_payload).update();
+            seeded = true;
+          }
+  - interval: 200ms
+    then:
+      - lambda: |-
+          screenshot_helper::process_commands(id(dashboard_display), id(dashboard_ui).get_dashboard());
+
+# --- Sensoren (update_interval: never → nur via Round-Robin) ---
+
+sensor:
+  - platform: template
+    id: battery_percent
+    name: "${friendly_name} Battery"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 18;
+      const float ramp = phase <= 9 ? phase : 18 - phase;
+      return 28.0f + ramp * 6.5f;
+
+  - platform: template
+    id: room_temperature
+    name: "${friendly_name} Room Temperature"
+    accuracy_decimals: 1
+    update_interval: never
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 14;
+      const float ramp = phase <= 7 ? phase : 14 - phase;
+      return 19.5f + ramp * 0.45f;
+
+  - platform: template
+    id: energy_price
+    name: "${friendly_name} Energy Price"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      const uint32_t step = id(sim_tick) % 15;
+      return 0.14f + 0.01f * step;
+
+  - platform: template
+    id: solar_power
+    name: "${friendly_name} Solar Power"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      const uint32_t phase = id(sim_tick) % 20;
+      const float ramp = phase <= 10 ? phase : 20 - phase;
+      return 120.0f + ramp * 85.0f;
+
+  - platform: template
+    id: grid_load
+    name: "${friendly_name} Grid Load"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      const uint32_t phase = (id(sim_tick) + 5) % 16;
+      const float ramp = phase <= 8 ? phase : 16 - phase;
+      return 180.0f + ramp * 70.0f;
+
+  - platform: template
+    id: humidity_sensor
+    name: "${friendly_name} Humidity"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      const uint32_t phase = (id(sim_tick) + 3) % 12;
+      const float ramp = phase <= 6 ? phase : 12 - phase;
+      return 40.0f + ramp * 5.0f;
+
+# --- Climate: statische Payloads (kein auto-update, für Touch-Testing) ---
+
+text_sensor:
+  - platform: template
+    id: climate_zone_a_payload
+    name: "${friendly_name} Zone A Climate"
+    update_interval: never
+    lambda: |-
+      return std::string("{\"temperature\":21.0,\"current_temperature\":20.5,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}");
+
+  - platform: template
+    id: climate_zone_b_payload
+    name: "${friendly_name} Zone B Climate"
+    update_interval: never
+    lambda: |-
+      return std::string("{\"temperature\":19.0,\"current_temperature\":18.5,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"auto\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}");
+
+  - platform: template
+    id: demo_light_state
+    name: "${friendly_name} Light State"
+    update_interval: never
+    lambda: |-
+      return (id(sim_tick) / 3) % 2 == 0 ? std::string("on") : std::string("off");
+
+switch:
+  - platform: template
+    id: demo_switch
+    name: "${friendly_name} Demo Switch"
+    optimistic: true
+
+# ==========================================================================
+#  Dashboard: 3 Pages mit Swipe
+#    Page 0: 3×3 Übersicht (alle Tile-Typen)
+#    Page 1: 2×2 mit großem Climate-Tile (2×2 Spanning)
+#    Page 2: 2×2 Gauge + Werte Übersicht
+# ==========================================================================
+
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 3
+  rows: 3
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: ${dashboard_font_file}
+  page_configs:
+    - page: 1
+      cols: 2
+      rows: 2
+    - page: 2
+      cols: 2
+      rows: 2
+  tiles:
+    # ===== PAGE 0: 3×3 Grid — Vollständige Übersicht =====
+    - type: battery
+      col: 1
+      row: 1
+      page: 0
+      label: BATTERY
+
+      sensor: battery_percent
+
+    - type: text_value
+      col: 2
+      row: 1
+      page: 0
+      label: ROOM TEMP
+      sensor: room_temperature
+      unit: "°C"
+      format: "%.1f"
+
+    - type: double_value
+      col: 3
+      row: 1
+      page: 0
+      top_label: PRICE
+      bottom_label: LOAD
+      top_sensor: energy_price
+      bottom_sensor: grid_load
+      top_unit: "€"
+      bottom_unit: "W"
+      top_format: "%.2f"
+      bottom_format: "%.0f"
+
+    - type: gauge
+      col: 1
+      row: 2
+      page: 0
+      label: SOLAR
+      sensor: solar_power
+      min_value: 0
+      max_value: 1000
+      red_threshold: 250
+      yellow_threshold: 600
+      unit: "W"
+      format: "%.0f"
+
+    - type: gauge
+      col: 2
+      row: 2
+      page: 0
+      label: GRID
+      sensor: grid_load
+      min_value: 0
+      max_value: 900
+      red_threshold: 250
+      yellow_threshold: 550
+      unit: "W"
+      format: "%.0f"
+
+    - type: climate
+      col: 3
+      row: 2
+      page: 0
+      label: ZONE A
+      payload: climate_zone_a_payload
+      entity_id: climate.demo_zone_a
+      fullscreen: true
+
+    - type: switch
+      col: 1
+      row: 3
+      page: 0
+      label: SWITCH
+      switch: demo_switch
+      entity_id: switch.demo_switch
+
+    - type: light
+      col: 2
+      row: 3
+      page: 0
+      label: LIGHT
+      state: demo_light_state
+      entity_id: light.demo_light
+
+    - type: climate
+      col: 3
+      row: 3
+      page: 0
+      label: ZONE B
+      payload: climate_zone_b_payload
+      entity_id: climate.demo_zone_b
+      fullscreen: true
+
+    # ===== PAGE 1: 2×2 mit großem Climate (2×2 Spanning) =====
+    - type: climate
+      col: 1
+      row: 1
+      page: 1
+      colspan: 2
+      rowspan: 2
+      label: ZONE B
+      payload: climate_zone_b_payload
+      entity_id: climate.demo_zone_b
+      fullscreen: true
+
+    # ===== PAGE 2: 2×2 Gauge + Werte =====
+    - type: gauge
+      col: 1
+      row: 1
+      page: 2
+      label: SOLAR
+      sensor: solar_power
+      min_value: 0
+      max_value: 1000
+      red_threshold: 250
+      yellow_threshold: 600
+      unit: "W"
+      format: "%.0f"
+
+    - type: gauge
+      col: 2
+      row: 1
+      page: 2
+      label: BATTERY
+      sensor: battery_percent
+      min_value: 0
+      max_value: 100
+      red_threshold: 25
+      yellow_threshold: 50
+      unit: "%"
+      format: "%.0f"
+
+    - type: text_value
+      col: 1
+      row: 2
+      page: 2
+      label: HUMIDITY
+      sensor: humidity_sensor
+      unit: "%"
+      format: "%.0f"
+
+    - type: double_value
+      col: 2
+      row: 2
+      page: 2
+      top_label: PRICE
+      bottom_label: GRID
+      top_sensor: energy_price
+      bottom_sensor: grid_load
+      top_unit: "€"
+      bottom_unit: "W"
+      top_format: "%.2f"
+      bottom_format: "%.0f"
