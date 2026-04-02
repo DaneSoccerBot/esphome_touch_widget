@@ -1,8 +1,9 @@
 substitutions:
-  # ACHTUNG: project_name/project_version hier hardcoded, weil diese Datei
-  # via GitHub-Import geladen wird und !include dort nicht aufloest.
-  # Quelle: build_settings.yaml (Root). Bei Versionsaenderung dort
-  # auch hier anpassen.
+  # Zentrale Versions-Referenz fuer das Projekt.
+  # Diese Werte muessen in display48_device_base.yaml und
+  # simulator_device_base.yaml gespiegelt werden, da ESPHome
+  # !include innerhalb von GitHub-Imports nicht aufloest.
+  # Primaerquelle: build_settings.yaml (Root)
   project_name: esphome.touch_widget
   project_version: "0.2.0-dev"
 

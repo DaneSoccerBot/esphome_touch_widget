@@ -1,4 +1,8 @@
 substitutions:
+  project_name: esphome.touch_widget
+  project_version: "0.2.0-dev"
+  package_ref: main
+  tile_dashboard_components_source: github://DaneSoccerBot/esphome_touch_widget/components@${package_ref}
   logger_level: INFO
   dashboard_font_file: gfonts://Roboto Condensed
   touch_rotation: "0"
@@ -6,5 +10,4 @@ substitutions:
   dashboard_height: "480"
 
 packages:
-  common: !include common.yaml
   device: !include ../device/display48_device_base.yaml
