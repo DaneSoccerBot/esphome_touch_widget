@@ -14,6 +14,30 @@
 #include "esp_heap_caps.h"
 #endif
 
+namespace pixel_buffer_detail {
+
+inline uint16_t *alloc_pixels(size_t pixels) {
+  const size_t bytes = pixels * sizeof(uint16_t);
+#ifdef USE_ESP32
+  uint16_t *buf = static_cast<uint16_t *>(heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  if (buf == nullptr)
+    buf = static_cast<uint16_t *>(heap_caps_malloc(bytes, MALLOC_CAP_8BIT));
+  return buf;
+#else
+  return static_cast<uint16_t *>(std::malloc(bytes));
+#endif
+}
+
+inline void free_pixels(uint16_t *buf) {
+#ifdef USE_ESP32
+  heap_caps_free(buf);
+#else
+  std::free(buf);
+#endif
+}
+
+}  // namespace pixel_buffer_detail
+
 /**
  *  PixelBuffer — Software-Renderbuffer (RGB565) für Offscreen-Zeichnen.
  *
@@ -263,12 +287,106 @@ class PixelBuffer {
     }
 
     const uint32_t t0 = esphome::millis();
+    const auto rotation = disp.get_rotation();
+#ifdef USE_ESP32
+    if (rotation != esphome::display::DISPLAY_ROTATION_0_DEGREES) {
+      const int out_w =
+          (rotation == esphome::display::DISPLAY_ROTATION_90_DEGREES ||
+           rotation == esphome::display::DISPLAY_ROTATION_270_DEGREES)
+              ? draw_h
+              : draw_w;
+      const int out_h =
+          (rotation == esphome::display::DISPLAY_ROTATION_90_DEGREES ||
+           rotation == esphome::display::DISPLAY_ROTATION_270_DEGREES)
+              ? draw_w
+              : draw_h;
+
+      const int canvas_w = disp.get_width();
+      const int canvas_h = disp.get_height();
+      int phys_x = dst_x;
+      int phys_y = dst_y;
+      switch (rotation) {
+        case esphome::display::DISPLAY_ROTATION_90_DEGREES:
+          phys_x = canvas_w - (dst_y + draw_h);
+          phys_y = dst_x;
+          break;
+        case esphome::display::DISPLAY_ROTATION_180_DEGREES:
+          phys_x = canvas_w - (dst_x + draw_w);
+          phys_y = canvas_h - (dst_y + draw_h);
+          break;
+        case esphome::display::DISPLAY_ROTATION_270_DEGREES:
+          phys_x = dst_y;
+          phys_y = canvas_h - (dst_x + draw_w);
+          break;
+        case esphome::display::DISPLAY_ROTATION_0_DEGREES:
+        default:
+          break;
+      }
+
+      const size_t rot_pixels = static_cast<size_t>(out_w) * out_h;
+      uint16_t *rot_buf = pixel_buffer_detail::alloc_pixels(rot_pixels);
+
+      if (rot_buf != nullptr) {
+        for (int out_y = 0; out_y < out_h; out_y++) {
+          for (int out_x = 0; out_x < out_w; out_x++) {
+            int src_x = out_x;
+            int src_y = out_y;
+            switch (rotation) {
+              case esphome::display::DISPLAY_ROTATION_90_DEGREES:
+                src_x = out_y;
+                src_y = draw_h - 1 - out_x;
+                break;
+              case esphome::display::DISPLAY_ROTATION_180_DEGREES:
+                src_x = draw_w - 1 - out_x;
+                src_y = draw_h - 1 - out_y;
+                break;
+              case esphome::display::DISPLAY_ROTATION_270_DEGREES:
+                src_x = draw_w - 1 - out_y;
+                src_y = out_x;
+                break;
+              case esphome::display::DISPLAY_ROTATION_0_DEGREES:
+              default:
+                break;
+            }
+
+            const size_t src_index = static_cast<size_t>(src_y + src_y_offset) * w_ +
+                                     static_cast<size_t>(src_x + src_x_offset);
+            rot_buf[static_cast<size_t>(out_y) * out_w + out_x] = buf_[src_index];
+          }
+        }
+
+        disp.draw_pixels_at(
+            phys_x, phys_y, out_w, out_h,
+            reinterpret_cast<const uint8_t *>(rot_buf),
+            esphome::display::ColorOrder::COLOR_ORDER_RGB,
+            esphome::display::ColorBitness::COLOR_BITNESS_565, true,
+            0, 0, 0);
+        pixel_buffer_detail::free_pixels(rot_buf);
+      } else {
+        ESP_LOGW("pbuf", "rotation buffer alloc failed: %dx%d", out_w, out_h);
+        disp.esphome::display::Display::draw_pixels_at(
+            dst_x, dst_y, draw_w, draw_h,
+            reinterpret_cast<const uint8_t *>(buf_),
+            esphome::display::ColorOrder::COLOR_ORDER_RGB,
+            esphome::display::ColorBitness::COLOR_BITNESS_565, true,
+            src_x_offset, src_y_offset, src_x_pad);
+      }
+    } else {
+      disp.draw_pixels_at(
+          dst_x, dst_y, draw_w, draw_h,
+          reinterpret_cast<const uint8_t *>(buf_),
+          esphome::display::ColorOrder::COLOR_ORDER_RGB,
+          esphome::display::ColorBitness::COLOR_BITNESS_565, true,
+          src_x_offset, src_y_offset, src_x_pad);
+    }
+#else
     disp.draw_pixels_at(
         dst_x, dst_y, draw_w, draw_h,
         reinterpret_cast<const uint8_t *>(buf_),
         esphome::display::ColorOrder::COLOR_ORDER_RGB,
         esphome::display::ColorBitness::COLOR_BITNESS_565, true,
         src_x_offset, src_y_offset, src_x_pad);
+#endif
     const uint32_t dt = esphome::millis() - t0;
     if (dt > 2) {
       ESP_LOGD("pbuf", "blit %dx%d @%d,%d -> %dx%d @%d,%d %ums",

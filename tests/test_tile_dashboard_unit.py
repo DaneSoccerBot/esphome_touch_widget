@@ -25,6 +25,7 @@ from components.tile_dashboard.config import (  # noqa: E402
 
 FONT_FILE = {"path": "../assets/fonts/RobotoCondensed-Regular.ttf", "type": "local"}
 PIXEL_BUFFER_HEADER = ROOT / "components/tile_dashboard/pixel_buffer.h"
+SDL_ESPHOME_CPP = ROOT / "components/sdl/sdl_esphome.cpp"
 
 
 def rgb565(red, green, blue):
@@ -345,6 +346,26 @@ class TileDashboardUnitTests(unittest.TestCase):
 
         self.assertIn("disp.get_clipping()", header)
         self.assertRegex(header, re.compile(r"draw_pixels_at\([\s\S]*src_x_offset, src_y_offset, src_x_pad\)"))
+
+    def test_pixelbuffer_blit_bypasses_driver_bulk_path_when_rotated(self):
+        header = PIXEL_BUFFER_HEADER.read_text()
+
+        self.assertIn("const auto rotation = disp.get_rotation();", header)
+        self.assertIn("uint16_t *rot_buf = pixel_buffer_detail::alloc_pixels(rot_pixels);", header)
+        self.assertIn("phys_x = canvas_w - (dst_y + draw_h);", header)
+        self.assertIn("phys_y = canvas_h - (dst_x + draw_w);", header)
+        self.assertIn("rot_buf[static_cast<size_t>(out_y) * out_w + out_x] = buf_[src_index];", header)
+        self.assertIn("pixel_buffer_detail::free_pixels(rot_buf);", header)
+        self.assertIn("disp.esphome::display::Display::draw_pixels_at(", header)
+
+    def test_sdl_draw_pixels_at_keeps_rgb565_bulk_path_when_rotated(self):
+        source = SDL_ESPHOME_CPP.read_text()
+
+        self.assertIn("if (bitness == display::COLOR_BITNESS_565 && order == display::COLOR_ORDER_RGB)", source)
+        self.assertIn("std::vector<uint16_t> bulk(static_cast<size_t>(rect.w) * rect.h);", source)
+        self.assertIn("dst_x = h - 1 - src_y;", source)
+        self.assertIn("dst_y = w - 1 - src_x;", source)
+        self.assertIn("SDL_UpdateTexture(this->texture_, &rect, bulk.data(), rect.w * 2);", source)
 
 
 if __name__ == "__main__":

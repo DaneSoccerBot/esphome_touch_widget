@@ -11,4 +11,5 @@ packages:
 
 external_components:
   - source: ${tile_dashboard_components_source}
-    components: [tile_dashboard]
+    components: [tile_dashboard, sdl]
+
