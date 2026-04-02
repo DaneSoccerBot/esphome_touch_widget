@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import os
+import re
 import subprocess
 import sys
 import venv
@@ -24,6 +25,7 @@ from tooling import (
 
 
 REQUIREMENTS_FILE = ROOT / "requirements-dev.txt"
+BUILD_SETTINGS_FILE = ROOT / "build_settings.yaml"
 PINNED_ESPHOME_VERSION = "2025.3.3"
 
 
@@ -164,6 +166,53 @@ def cmd_test(_: argparse.Namespace) -> None:
     cmd_config(argparse.Namespace())
 
 
+# GitHub-Import-Dateien die project_name/project_version inline brauchen,
+# weil ESPHome !include innerhalb von GitHub-Imports nicht auflöst.
+IMPORT_YAML_FILES = (
+    ROOT / "packages/import/display48_device_base.yaml",
+    ROOT / "packages/import/simulator_device_base.yaml",
+    ROOT / "packages/import/common.yaml",
+)
+
+
+def _parse_build_settings() -> dict[str, str]:
+    """Parse build_settings.yaml (simple key: value format)."""
+    settings = {}
+    for line in BUILD_SETTINGS_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition(":")
+        settings[key.strip()] = value.strip().strip('"')
+    return settings
+
+
+def cmd_sync_version(_: argparse.Namespace) -> None:
+    """Sync project_name/project_version from build_settings.yaml into import YAMLs."""
+    settings = _parse_build_settings()
+    version = settings["project_version"]
+    name = settings["project_name"]
+    print(f"Source: build_settings.yaml  →  {name} {version}")
+
+    version_re = re.compile(r'(project_version:\s*")[^"]*(")') 
+    name_re = re.compile(r'(project_name:\s*)\S+')
+    updated = []
+
+    for path in IMPORT_YAML_FILES:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        new_text = version_re.sub(rf'\g<1>{version}\2', text)
+        new_text = name_re.sub(rf'\g<1>{name}', new_text)
+        if new_text != text:
+            path.write_text(new_text, encoding="utf-8")
+            updated.append(path.relative_to(ROOT))
+            print(f"  updated {path.relative_to(ROOT)}")
+
+    if not updated:
+        print("  all import files already up to date")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cross-platform dev helper for esphome_touch_widget")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -179,6 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
         "run-sim-3x3": cmd_run_sim_3x3,
         "run-sim-all": cmd_run_sim_all,
         "test": cmd_test,
+        "sync-version": cmd_sync_version,
     }
     for name, handler in commands.items():
         subparsers.add_parser(name)
