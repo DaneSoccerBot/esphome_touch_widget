@@ -1,6 +1,8 @@
 #ifndef SWITCH_TILE_H
 #define SWITCH_TILE_H
 
+#if __has_include("esphome/components/switch/switch.h")
+
 #include <string>
 #include "tile.h"
 #include "colors.h"
@@ -77,5 +79,7 @@ class SwitchTile : public Tile {
 
   Cfg cfg_;
 };
+
+#endif
 
 #endif  // SWITCH_TILE_H
