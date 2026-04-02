@@ -13,7 +13,6 @@
 #include "esphome/components/touchscreen/touchscreen.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/switch/switch.h"
 
 #include "display_context.h"
 #include "integration.h"
@@ -23,7 +22,9 @@
 #include "double_value_tile.h"
 #include "gauge_tile.h"
 #include "light_tile.h"
+#if __has_include("esphome/components/switch/switch.h")
 #include "switch_tile.h"
+#endif
 #include "text_value_tile.h"
 
 namespace esphome {
@@ -310,6 +311,7 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     t.set_rowspan(rowspan);
   }
 
+#if __has_include("esphome/components/switch/switch.h")
   void add_switch_tile(uint8_t col, uint8_t row, std::string label,
                        switch_::Switch *sw, std::string entity_id, bool fullscreen = false,
                        uint8_t page = 0, uint8_t colspan = 1, uint8_t rowspan = 1) {
@@ -321,6 +323,7 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     t.set_colspan(colspan);
     t.set_rowspan(rowspan);
   }
+#endif
 
   void add_light_tile(uint8_t col, uint8_t row, std::string label,
                       text_sensor::TextSensor *state, std::string entity_id, bool fullscreen = false,

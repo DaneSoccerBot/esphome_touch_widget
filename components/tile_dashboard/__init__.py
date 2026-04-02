@@ -52,7 +52,6 @@ AUTO_INCLUDES = (
     "esphome/components/tile_dashboard/double_value_tile.h",
     "esphome/components/tile_dashboard/gauge_tile.h",
     "esphome/components/tile_dashboard/light_tile.h",
-    "esphome/components/tile_dashboard/switch_tile.h",
     "esphome/components/tile_dashboard/text_value_tile.h",
 )
 
@@ -206,6 +205,10 @@ async def to_code(config):
     cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
     for header in AUTO_INCLUDES:
         cg.add_global(cg.RawStatement(f'#include "{header}"'))
+    if any(tile[CONF_TYPE] == "switch" for tile in config[CONF_TILES]):
+        cg.add_global(
+            cg.RawStatement('#include "esphome/components/tile_dashboard/switch_tile.h"')
+        )
 
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

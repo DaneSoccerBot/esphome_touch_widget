@@ -4,6 +4,7 @@
 #include <string>
 #include "tile.h"
 #include "colors.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/api/api_server.h"
 #include "esphome/components/api/homeassistant_service.h"
