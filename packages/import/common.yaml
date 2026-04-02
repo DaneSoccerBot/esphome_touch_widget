@@ -1,0 +1,11 @@
+substitutions:
+  # ACHTUNG: project_name/project_version hier hardcoded, weil diese Datei
+  # via GitHub-Import geladen wird und !include dort nicht aufloest.
+  # Quelle: build_settings.yaml (Root). Bei Versionsaenderung dort
+  # auch hier anpassen.
+  project_name: esphome.touch_widget
+  project_version: "0.2.0-dev"
+
+  # Kann pro User-YAML auf Tag/Commit gesetzt werden, z.B. v0.1.1 oder 7cf56a2
+  package_ref: main
+  tile_dashboard_components_source: github://DaneSoccerBot/esphome_touch_widget/components@${package_ref}

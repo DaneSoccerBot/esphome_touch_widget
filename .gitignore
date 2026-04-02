@@ -55,3 +55,6 @@ packages/layouts/
 packages/profiles/
 packages/base/tile_dashboard_adoptable_base.yaml
 projects/
+
+# Lokale, nicht versionierte Benutzer-YAMLs
+YAML_OWN/

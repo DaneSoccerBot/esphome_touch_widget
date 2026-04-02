@@ -1,8 +1,7 @@
 substitutions:
+  <<: !include ../build_settings.yaml
   device_name: dashboard-simulator
   friendly_name: Dashboard Simulator
-  project_name: esphome.touch_widget
-  project_version: "0.1.0-dev"
   logger_level: DEBUG
   dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
   tile_dashboard_components_source: ../components

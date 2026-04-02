@@ -1,8 +1,7 @@
 substitutions:
+  <<: !include ../build_settings.yaml
   device_name: display48norelay
   friendly_name: Display 48 No Relay
-  project_name: esphome.touch_widget
-  project_version: "0.1.0-dev"
   logger_level: DEBUG
   dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
   tile_dashboard_components_source: ../components

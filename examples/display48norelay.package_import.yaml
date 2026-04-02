@@ -1,8 +1,7 @@
 substitutions:
+  <<: !include ../build_settings.yaml
   device_name: display48pkgimport
   friendly_name: Display 48 Package Import
-  project_name: esphome.touch_widget
-  project_version: "0.1.0-dev"
   logger_level: DEBUG
   wifi_ssid: YOUR_WIFI_SSID
   wifi_password: YOUR_WIFI_PASSWORD

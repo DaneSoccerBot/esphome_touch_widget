@@ -1,10 +1,9 @@
 # ESP32 Showcase — 3 Pages mit Swipe, 3×3 Grid, großes Climate-Tile
 # Flash: esphome run examples/esp32_showcase.yaml --device /dev/cu.usbserial-21230
 substitutions:
+  <<: !include ../build_settings.yaml
   device_name: esp32-showcase
   friendly_name: ESP32 Showcase
-  project_name: esphome.touch_widget
-  project_version: "0.1.0-dev"
   logger_level: DEBUG
   dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
   tile_dashboard_components_source: ../components
@@ -33,7 +32,7 @@ api:
 
 external_components:
   - source: ${tile_dashboard_components_source}
-    components: [tile_dashboard]
+    components: [tile_dashboard, st7701s]
     refresh: 0s
 
 packages:

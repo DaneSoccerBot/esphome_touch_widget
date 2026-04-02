@@ -1,0 +1,370 @@
+substitutions:
+  # Nur geraetespezifische Werte hier pflegen.
+  # project_name/project_version kommen zentral aus packages/import/common.yaml.
+  device_name: dashboard-example
+  friendly_name: Dashboard Example
+
+  wifi_ssid: YOUR_WIFI_SSID
+  wifi_password: YOUR_WIFI_PASSWORD
+  api_encryption_key: BASE64_32_BYTE_KEY
+  ota_password: YOUR_OTA_PASSWORD
+
+  # Ref zentral fuer Packages + externe Components.
+  # Fuer reproduzierbare Builds auf Tag oder Commit pinnen (z.B. v0.1.1 / 7cf56a2)
+  package_ref: main
+
+  # Layout/Touch
+  dashboard_width: "480"
+  dashboard_height: "480"
+  touch_rotation: "0"
+  dashboard_display_rotation: "0"
+
+packages:
+  common:
+    url: https://github.com/DaneSoccerBot/esphome_touch_widget
+    file: packages/import/common.yaml
+    ref: ${package_ref}
+    refresh: 0s
+  device:
+    url: https://github.com/DaneSoccerBot/esphome_touch_widget
+    file: packages/import/display48_device_base.yaml
+    ref: ${package_ref}
+    refresh: 0s
+
+logger:
+  level: DEBUG
+
+# -----------------------------------------------------------------------------
+# Mock-Daten: fuer Demo ohne HA-Abhaengigkeiten
+# -----------------------------------------------------------------------------
+globals:
+  - id: demo_tick
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          id(demo_tick)++;
+
+sensor:
+  - platform: template
+    id: demo_battery
+    name: "${friendly_name} Battery"
+    update_interval: 1s
+    lambda: |-
+      return 25.0f + float(id(demo_tick) % 70);
+
+  - platform: template
+    id: demo_temp
+    name: "${friendly_name} Room Temp"
+    update_interval: 1s
+    lambda: |-
+      return 19.0f + 0.2f * float(id(demo_tick) % 20);
+
+  - platform: template
+    id: demo_humidity
+    name: "${friendly_name} Humidity"
+    update_interval: 1s
+    lambda: |-
+      return 40.0f + float(id(demo_tick) % 25);
+
+  - platform: template
+    id: demo_solar
+    name: "${friendly_name} Solar"
+    update_interval: 1s
+    lambda: |-
+      return 150.0f + 20.0f * float(id(demo_tick) % 20);
+
+  - platform: template
+    id: demo_grid
+    name: "${friendly_name} Grid"
+    update_interval: 1s
+    lambda: |-
+      return 120.0f + 15.0f * float((id(demo_tick) + 7) % 20);
+
+  - platform: template
+    id: demo_price
+    name: "${friendly_name} Price"
+    update_interval: 1s
+    lambda: |-
+      return 0.17f + 0.01f * float(id(demo_tick) % 12);
+
+  - platform: template
+    id: demo_outdoor
+    name: "${friendly_name} Outdoor"
+    update_interval: 1s
+    lambda: |-
+      return 8.0f + 0.3f * float((id(demo_tick) + 4) % 18);
+
+text_sensor:
+  - platform: template
+    id: demo_climate_a_payload
+    update_interval: 1s
+    lambda: |-
+      const float target = 20.0f + 0.5f * float(id(demo_tick) % 8);
+      const float current = 19.0f + 0.4f * float((id(demo_tick) + 2) % 8);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":16,\"max_temp\":28,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\",\"auto\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: demo_climate_b_payload
+    update_interval: 1s
+    lambda: |-
+      const float target = 45.0f + 0.5f * float(id(demo_tick) % 6);
+      const float current = 43.0f + 0.4f * float((id(demo_tick) + 1) % 6);
+      char buf[256];
+      snprintf(
+        buf,
+        sizeof(buf),
+        "{\"temperature\":%.1f,\"current_temperature\":%.1f,\"min_temp\":35,\"max_temp\":60,\"target_temp_step\":0.5,\"mode\":\"heat\",\"hvac_modes\":[\"off\",\"heat\"]}",
+        target,
+        current);
+      return std::string(buf);
+
+  - platform: template
+    id: demo_light_state
+    update_interval: 1s
+    lambda: |-
+      return id(demo_switch).state ? std::string("on") : std::string("off");
+
+switch:
+  - platform: template
+    id: demo_switch
+    name: "${friendly_name} Demo Switch"
+    optimistic: true
+
+# -----------------------------------------------------------------------------
+# Dashboard: 3 Seiten mit unterschiedlichen Grids (3x3, 2x3, 4x2)
+# -----------------------------------------------------------------------------
+tile_dashboard:
+  id: dashboard_ui
+  display: dashboard_display
+  touchscreen: dashboard_touchscreen
+  cols: 3
+  rows: 3
+  width: ${dashboard_width}
+  height: ${dashboard_height}
+  touch_rotation: ${touch_rotation}
+  font_file: gfonts://Roboto Condensed
+
+  # Seite 0 nutzt default 3x3. Seite 1/2 haben eigenes Grid.
+  page_configs:
+    - page: 1
+      cols: 2
+      rows: 3
+    - page: 2
+      cols: 4
+      rows: 2
+
+  tiles:
+    # -------------------- Seite 0 (3x3) --------------------
+    - type: battery
+      page: 0
+      col: 1
+      row: 1
+      label: BATTERY
+      sensor: demo_battery
+
+    - type: text_value
+      page: 0
+      col: 2
+      row: 1
+      label: ROOM
+      sensor: demo_temp
+      unit: "°C"
+      format: "%.1f"
+
+    - type: text_value
+      page: 0
+      col: 3
+      row: 1
+      label: HUMID
+      sensor: demo_humidity
+      unit: "%"
+      format: "%.0f"
+
+    - type: gauge
+      page: 0
+      col: 1
+      row: 2
+      label: SOLAR
+      sensor: demo_solar
+      min_value: 0
+      max_value: 1000
+      red_threshold: 250
+      yellow_threshold: 600
+      unit: "W"
+      format: "%.0f"
+
+    - type: gauge
+      page: 0
+      col: 2
+      row: 2
+      label: GRID
+      sensor: demo_grid
+      min_value: 0
+      max_value: 900
+      red_threshold: 200
+      yellow_threshold: 500
+      unit: "W"
+      format: "%.0f"
+
+    - type: double_value
+      page: 0
+      col: 3
+      row: 2
+      top_label: PRICE
+      bottom_label: OUTDOOR
+      top_sensor: demo_price
+      bottom_sensor: demo_outdoor
+      top_unit: "€"
+      bottom_unit: "°C"
+      top_format: "%.2f"
+      bottom_format: "%.1f"
+
+    - type: climate
+      page: 0
+      col: 1
+      row: 3
+      label: ROOM CLIMATE
+      fullscreen: true
+      payload: demo_climate_a_payload
+      # Fuer echte HA-Entity ersetzen
+      entity_id: climate.demo_room
+
+    - type: switch
+      page: 0
+      col: 2
+      row: 3
+      label: SWITCH
+      switch: demo_switch
+      # Fuer echte HA-Entity ersetzen (z.B. switch.kitchen_light)
+      entity_id: switch.demo_switch
+
+    - type: light
+      page: 0
+      col: 3
+      row: 3
+      label: LIGHT
+      state: demo_light_state
+      # Fuer echte HA-Entity ersetzen (z.B. light.office)
+      entity_id: light.demo_light
+
+    # -------------------- Seite 1 (2x3) --------------------
+    - type: climate
+      page: 1
+      col: 1
+      row: 1
+      label: WATER HEATER
+      payload: demo_climate_b_payload
+      entity_id: climate.demo_water
+      colspan: 2
+
+    - type: text_value
+      page: 1
+      col: 1
+      row: 2
+      label: ROOM
+      sensor: demo_temp
+      unit: "°C"
+      format: "%.1f"
+
+    - type: text_value
+      page: 1
+      col: 2
+      row: 2
+      label: HUMID
+      sensor: demo_humidity
+      unit: "%"
+      format: "%.0f"
+
+    - type: double_value
+      page: 1
+      col: 1
+      row: 3
+      top_label: SOLAR
+      bottom_label: GRID
+      top_sensor: demo_solar
+      bottom_sensor: demo_grid
+      top_unit: "W"
+      bottom_unit: "W"
+      top_format: "%.0f"
+      bottom_format: "%.0f"
+      colspan: 2
+
+    # -------------------- Seite 2 (4x2) --------------------
+    - type: battery
+      page: 2
+      col: 1
+      row: 1
+      label: BAT
+      sensor: demo_battery
+
+    - type: text_value
+      page: 2
+      col: 2
+      row: 1
+      label: TEMP
+      sensor: demo_temp
+      unit: "°"
+      format: "%.1f"
+
+    - type: gauge
+      page: 2
+      col: 3
+      row: 1
+      label: SOL
+      sensor: demo_solar
+      min_value: 0
+      max_value: 1000
+      red_threshold: 250
+      yellow_threshold: 600
+      unit: "W"
+      format: "%.0f"
+
+    - type: switch
+      page: 2
+      col: 4
+      row: 1
+      label: SW
+      switch: demo_switch
+      entity_id: switch.demo_switch
+
+    - type: double_value
+      page: 2
+      col: 1
+      row: 2
+      top_label: PRICE
+      bottom_label: OUT
+      top_sensor: demo_price
+      bottom_sensor: demo_outdoor
+      top_unit: "€"
+      bottom_unit: "°"
+      top_format: "%.2f"
+      bottom_format: "%.1f"
+      colspan: 2
+
+    - type: light
+      page: 2
+      col: 3
+      row: 2
+      label: LIGHT
+      state: demo_light_state
+      entity_id: light.demo_light
+
+    - type: climate
+      page: 2
+      col: 4
+      row: 2
+      label: CLM
+      payload: demo_climate_a_payload
+      entity_id: climate.demo_room

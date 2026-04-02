@@ -1,5 +1,9 @@
 substitutions:
   dashboard_display_rotation: "0"
+  dashboard_display_mirror_x: "false"
+  dashboard_display_mirror_y: "false"
+  dashboard_touch_mirror_x: "false"
+  dashboard_touch_mirror_y: "false"
 
 i2c:
   - id: bus_a
@@ -53,8 +57,8 @@ touchscreen:
   id: dashboard_touchscreen
   display: dashboard_display
   transform:
-    mirror_x: true
-    mirror_y: true
+    mirror_x: ${dashboard_touch_mirror_x}
+    mirror_y: ${dashboard_touch_mirror_y}
 
 display:
   - platform: st7701s
@@ -71,8 +75,8 @@ display:
       height: ${dashboard_height}
     invert_colors: false
     transform:
-      mirror_x: true
-      mirror_y: true
+      mirror_x: ${dashboard_display_mirror_x}
+      mirror_y: ${dashboard_display_mirror_y}
     cs_pin: 39
     reset_pin:
       pca9554: p_c_a
