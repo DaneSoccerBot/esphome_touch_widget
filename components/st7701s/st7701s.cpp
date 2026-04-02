@@ -255,10 +255,8 @@ void ST7701S::dump_config() {
   LOG_PIN("  DE Pin: ", this->de_pin_);
   LOG_PIN("  Reset Pin: ", this->reset_pin_);
   size_t data_pin_count = sizeof(this->data_pins_) / sizeof(this->data_pins_[0]);
-  char pin_summary[GPIO_SUMMARY_MAX_LEN];
   for (size_t i = 0; i != data_pin_count; i++) {
-    this->data_pins_[i]->dump_summary(pin_summary, sizeof(pin_summary));
-    ESP_LOGCONFIG(TAG, "  Data pin %d: %s", i, pin_summary);
+    ESP_LOGCONFIG(TAG, "  Data pin %d: %s", i, this->data_pins_[i]->dump_summary().c_str());
   }
   ESP_LOGCONFIG(TAG, "  SPI Data rate: %dMHz", (unsigned) (this->data_rate_ / 1000000));
 }

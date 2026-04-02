@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -23,6 +24,59 @@ from components.tile_dashboard.config import (  # noqa: E402
 
 
 FONT_FILE = {"path": "../assets/fonts/RobotoCondensed-Regular.ttf", "type": "local"}
+PIXEL_BUFFER_HEADER = ROOT / "components/tile_dashboard/pixel_buffer.h"
+
+
+def rgb565(red, green, blue):
+    return ((red & 0xF8) << 8) | ((green & 0xFC) << 3) | (blue >> 3)
+
+
+def pixelbuffer_esp32_bytes(color565):
+    swapped = ((color565 >> 8) | ((color565 & 0xFF) << 8)) & 0xFFFF
+    return bytes((swapped & 0xFF, swapped >> 8))
+
+
+def decode_display_565(raw_bytes, *, big_endian):
+    if big_endian:
+        return (raw_bytes[0] << 8) | raw_bytes[1]
+    return raw_bytes[0] | (raw_bytes[1] << 8)
+
+
+def clip_blit_geometry(dst_x, dst_y, width, height, clip_rect=None):
+    src_x_offset = 0
+    src_y_offset = 0
+    src_x_pad = 0
+    draw_x = dst_x
+    draw_y = dst_y
+    draw_w = width
+    draw_h = height
+
+    if clip_rect is not None:
+        clip_x, clip_y, clip_w, clip_h = clip_rect
+        left = max(draw_x, clip_x)
+        top = max(draw_y, clip_y)
+        right = min(draw_x + draw_w, clip_x + clip_w)
+        bottom = min(draw_y + draw_h, clip_y + clip_h)
+        if left >= right or top >= bottom:
+            return None
+
+        src_x_offset = left - draw_x
+        src_y_offset = top - draw_y
+        draw_w = right - left
+        draw_h = bottom - top
+        draw_x = left
+        draw_y = top
+        src_x_pad = width - draw_w - src_x_offset
+
+    return {
+        "dst_x": draw_x,
+        "dst_y": draw_y,
+        "draw_w": draw_w,
+        "draw_h": draw_h,
+        "src_x_offset": src_x_offset,
+        "src_y_offset": src_y_offset,
+        "src_x_pad": src_x_pad,
+    }
 
 
 class TileDashboardUnitTests(unittest.TestCase):
@@ -224,6 +278,73 @@ class TileDashboardUnitTests(unittest.TestCase):
                 for conf in configs
             )
         )
+
+    def test_pixelbuffer_esp32_bytes_require_big_endian_decode(self):
+        color565 = rgb565(0xF2, 0x85, 0x00)
+        raw_bytes = pixelbuffer_esp32_bytes(color565)
+
+        self.assertEqual(decode_display_565(raw_bytes, big_endian=True), color565)
+        self.assertNotEqual(decode_display_565(raw_bytes, big_endian=False), color565)
+
+    def test_pixelbuffer_blit_marks_rgb565_buffer_big_endian(self):
+        header = PIXEL_BUFFER_HEADER.read_text()
+
+        self.assertRegex(
+            header,
+            re.compile(r"COLOR_BITNESS_565,\s*true\s*,"),
+            "PixelBuffer::blit must declare RGB565 data as big-endian to match to_565() on ESP32.",
+        )
+
+    def test_clip_blit_geometry_keeps_full_buffer_without_clip(self):
+        self.assertEqual(
+            clip_blit_geometry(10, 20, 80, 40),
+            {
+                "dst_x": 10,
+                "dst_y": 20,
+                "draw_w": 80,
+                "draw_h": 40,
+                "src_x_offset": 0,
+                "src_y_offset": 0,
+                "src_x_pad": 0,
+            },
+        )
+
+    def test_clip_blit_geometry_crops_left_and_top_edges(self):
+        self.assertEqual(
+            clip_blit_geometry(10, 20, 80, 40, clip_rect=(30, 35, 100, 100)),
+            {
+                "dst_x": 30,
+                "dst_y": 35,
+                "draw_w": 60,
+                "draw_h": 25,
+                "src_x_offset": 20,
+                "src_y_offset": 15,
+                "src_x_pad": 0,
+            },
+        )
+
+    def test_clip_blit_geometry_crops_right_edge_and_sets_x_pad(self):
+        self.assertEqual(
+            clip_blit_geometry(10, 20, 80, 40, clip_rect=(30, 20, 30, 40)),
+            {
+                "dst_x": 30,
+                "dst_y": 20,
+                "draw_w": 30,
+                "draw_h": 40,
+                "src_x_offset": 20,
+                "src_y_offset": 0,
+                "src_x_pad": 30,
+            },
+        )
+
+    def test_clip_blit_geometry_returns_none_when_fully_outside_clip(self):
+        self.assertIsNone(clip_blit_geometry(10, 20, 80, 40, clip_rect=(200, 200, 20, 20)))
+
+    def test_pixelbuffer_blit_uses_clip_offsets_with_draw_pixels(self):
+        header = PIXEL_BUFFER_HEADER.read_text()
+
+        self.assertIn("disp.get_clipping()", header)
+        self.assertRegex(header, re.compile(r"draw_pixels_at\([\s\S]*src_x_offset, src_y_offset, src_x_pad\)"))
 
 
 if __name__ == "__main__":

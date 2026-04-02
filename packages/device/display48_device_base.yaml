@@ -11,5 +11,5 @@ packages:
 
 external_components:
   - source: ${tile_dashboard_components_source}
-    components: [tile_dashboard, st7701s]
+    components: [tile_dashboard]
     refresh: 0s

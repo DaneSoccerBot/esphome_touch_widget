@@ -234,15 +234,45 @@ class PixelBuffer {
   /** Buffer auf das Display blitten (1 DMA-Transfer auf ST7701S). */
   void blit(esphome::display::Display &disp, int x, int y) const {
     if (!buf_ || w_ <= 0 || h_ <= 0) return;
+
+    int dst_x = x;
+    int dst_y = y;
+    int draw_w = w_;
+    int draw_h = h_;
+    int src_x_offset = 0;
+    int src_y_offset = 0;
+    int src_x_pad = 0;
+
+    if (disp.is_clipping()) {
+      const auto clip = disp.get_clipping();
+      if (clip.is_set()) {
+        const int left = std::max(dst_x, static_cast<int>(clip.x));
+        const int top = std::max(dst_y, static_cast<int>(clip.y));
+        const int right = std::min(dst_x + draw_w, static_cast<int>(clip.x2()));
+        const int bottom = std::min(dst_y + draw_h, static_cast<int>(clip.y2()));
+        if (left >= right || top >= bottom) return;
+
+        src_x_offset = left - dst_x;
+        src_y_offset = top - dst_y;
+        draw_w = right - left;
+        draw_h = bottom - top;
+        dst_x = left;
+        dst_y = top;
+        src_x_pad = w_ - draw_w - src_x_offset;
+      }
+    }
+
     const uint32_t t0 = esphome::millis();
     disp.draw_pixels_at(
-        x, y, w_, h_,
+        dst_x, dst_y, draw_w, draw_h,
         reinterpret_cast<const uint8_t *>(buf_),
         esphome::display::ColorOrder::COLOR_ORDER_RGB,
-        esphome::display::ColorBitness::COLOR_BITNESS_565, false);
+        esphome::display::ColorBitness::COLOR_BITNESS_565, true,
+        src_x_offset, src_y_offset, src_x_pad);
     const uint32_t dt = esphome::millis() - t0;
     if (dt > 2) {
-      ESP_LOGD("pbuf", "blit %dx%d @%d,%d %ums", w_, h_, x, y, dt);
+      ESP_LOGD("pbuf", "blit %dx%d @%d,%d -> %dx%d @%d,%d %ums",
+               w_, h_, x, y, draw_w, draw_h, dst_x, dst_y, dt);
     }
   }
 
