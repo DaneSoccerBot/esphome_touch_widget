@@ -6,12 +6,29 @@ substitutions:
   dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
   tile_dashboard_components_source: ../components
   touch_rotation: "0"
+  dashboard_display_rotation: "0"
   dashboard_width: "800"
   dashboard_height: "480"
   simulator_sdl_options: ""
 
 packages:
   device: !include ../packages/device/simulator_device_base.yaml
+
+globals:
+  - id: sim_tick
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          #ifdef USE_HOST
+          if (std::getenv("TILE_DASHBOARD_SIM_FREEZE_TICK") != nullptr)
+            return;
+          #endif
+          id(sim_tick)++;
 
 sensor:
   - platform: template
@@ -20,7 +37,9 @@ sensor:
     accuracy_decimals: 0
     update_interval: 2s
     lambda: |-
-      return 48.0f + 40.0f * (0.5f + 0.5f * std::sin(float(millis()) / 5000.0f));
+      const uint32_t phase = id(sim_tick) % 20;
+      const float ramp = phase <= 10 ? phase : 20 - phase;
+      return 38.0f + ramp * 4.0f;
 
   - platform: template
     id: room_temperature
@@ -28,7 +47,9 @@ sensor:
     accuracy_decimals: 1
     update_interval: 1s
     lambda: |-
-      return 20.5f + 2.0f * std::sin(float(millis()) / 9000.0f);
+      const uint32_t phase = id(sim_tick) % 16;
+      const float ramp = phase <= 8 ? phase : 16 - phase;
+      return 19.5f + ramp * 0.35f;
 
   - platform: template
     id: energy_price
@@ -36,7 +57,8 @@ sensor:
     accuracy_decimals: 2
     update_interval: 2s
     lambda: |-
-      return 0.21f + 0.07f * (0.5f + 0.5f * std::sin(float(millis()) / 6500.0f));
+      const uint32_t step = id(sim_tick) % 12;
+      return 0.18f + step * 0.01f;
 
   - platform: template
     id: solar_power
@@ -44,7 +66,9 @@ sensor:
     accuracy_decimals: 0
     update_interval: 1s
     lambda: |-
-      return 250.0f + 650.0f * (0.5f + 0.5f * std::sin(float(millis()) / 4000.0f));
+      const uint32_t phase = id(sim_tick) % 18;
+      const float ramp = phase <= 9 ? phase : 18 - phase;
+      return 180.0f + ramp * 70.0f;
 
 text_sensor:
   - platform: template
@@ -52,8 +76,8 @@ text_sensor:
     name: "${friendly_name} Climate Payload"
     update_interval: 1s
     lambda: |-
-      float target = 21.0f + 0.8f * std::sin(float(millis()) / 8000.0f);
-      float current = 20.0f + 1.0f * std::sin(float(millis()) / 6000.0f);
+      const float target = 20.0f + 0.5f * float(id(sim_tick) % 8);
+      const float current = 19.0f + 0.4f * float((id(sim_tick) + 2) % 8);
       char buf[256];
       snprintf(
         buf,
@@ -68,7 +92,7 @@ text_sensor:
     name: "${friendly_name} Demo Light State"
     update_interval: 1s
     lambda: |-
-      return (millis() / 2500) % 2 == 0 ? std::string("on") : std::string("off");
+      return (id(sim_tick) % 4) < 2 ? std::string("on") : std::string("off");
 
 switch:
   - platform: template

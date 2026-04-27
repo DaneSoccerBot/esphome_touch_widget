@@ -7,6 +7,7 @@
 #include <cstdio>    // std::snprintf
 #include "tile.h"
 #include "colors.h"  // Color definitions
+#include "render_primitives.h"
 #include "esphome/components/sensor/sensor.h"
 
 using esphome::display::Display;
@@ -62,9 +63,6 @@ protected:
 
     auto [cx0, cy0, cx1, cy1] = value_clip();
     it.start_clipping(cx0, cy0, cx1, cy1);
-    // nur Hintergrund-Farbe (nicht voller Rahmen!)
-    ctx_.bg_renderer.drawBgColor(it,
-                                 cx0, cy0, cx1 - cx0, cy1 - cy0);
 
     // Farben bestimmen
     esphome::Color fill_color =
@@ -78,31 +76,26 @@ protected:
     const int x = abs_x() + tile_w() * 0.2f;
     const int y = abs_y() + tile_h() * 0.35f;
 
-    // Außenrahmen
-    it.rectangle(x - 2, y, bar_w - 1, bar_h, outline);
-
-    // Spitze
-    const int tip_w = bar_w * 0.04f;
-    const int tip_h = bar_h / 3;
-    const int tip_x = x + bar_w;
-    const int tip_y = y + bar_h / 3;
-    it.filled_rectangle(tip_x, tip_y, tip_w, tip_h, outline);
-
-    // Segmente
-    const int segments = 18;
-    const int gap = 1;
-    const int seg_w = (bar_w - (segments + 1) * gap) / segments;
-    const int seg_h = bar_h - 4;
-    const int seg_y = y + 2;
-    const int filled = std::round((lvl / 100.0f) * segments);
-
-    for (int i = 0; i < segments; ++i)
-    {
-      int seg_x = x + gap + i * (seg_w + gap);
-      if (i < filled)
-        it.filled_rectangle(seg_x, seg_y, seg_w, seg_h, fill_color);
-      else
-        it.rectangle(seg_x, seg_y, seg_w, seg_h, outline);
+    const int clip_w = cx1 - cx0;
+    const int clip_h = cy1 - cy0;
+    const uint16_t bg565 = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+    if (battery_buf_.ensure(clip_w, clip_h)) {
+      battery_buf_.clear(bg565);
+      esphome::tile_dashboard::render::BatchPrimitives::draw_segmented_battery(
+          battery_buf_,
+          esphome::tile_dashboard::render::SegmentedBatterySpec{
+              x - cx0,
+              y - cy0,
+              bar_w,
+              bar_h,
+              lvl,
+              18,
+              PixelBuffer::to_565(fill_color),
+              PixelBuffer::to_565(outline),
+          });
+      battery_buf_.blit(it, cx0, cy0);
+    } else {
+      clear_area_fast(it, cx0, cy0, clip_w, clip_h);
     }
 
     it.end_clipping();
@@ -143,6 +136,7 @@ private:
   Cfg cfg_;
   float level_{-1.0f};
   float prev_val_{NAN};
+  PixelBuffer battery_buf_;
 };
 
 #endif // BATTERY_TILE_H

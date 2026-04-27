@@ -30,6 +30,10 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
+          #ifdef USE_HOST
+          if (std::getenv("TILE_DASHBOARD_SIM_FREEZE_TICK") != nullptr)
+            return;
+          #endif
           id(sim_tick)++;
 
 sensor:

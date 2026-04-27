@@ -171,15 +171,15 @@ can also use the Python entry point directly:
 - macOS / Linux: `python3 scripts/dev.py setup`
 - Windows: `py -3 scripts/dev.py setup`
 
-The new dev entry point wraps the common tasks without requiring manual
-activation of the virtual environment. On Windows it also injects the MSYS2
-UCRT64 toolchain paths automatically once bootstrap has completed. PlatformIO
-state is kept repo-local under `.cache/platformio`, so simulator builds do not
-depend on an existing `~/.platformio` setup.
+The dev entry point wraps common tasks without requiring manual activation of
+the virtual environment. On Windows it also injects the MSYS2 UCRT64 toolchain
+paths automatically once bootstrap has completed. PlatformIO state is kept
+repo-local under `.cache/platformio`, so simulator builds do not depend on an
+existing `~/.platformio` setup.
 
 ### Simulator
 
-Quick iteration in the compact simulator:
+Run the compact 2x2 simulator:
 
 ```bash
 python3 scripts/dev.py run-sim-2x2
@@ -197,7 +197,13 @@ Run the full tile coverage simulator:
 python3 scripts/dev.py run-sim-all
 ```
 
-### ESP32
+Compile all simulator examples without starting a window:
+
+```bash
+python3 scripts/dev.py compile-sim
+```
+
+### ESP32 Configs
 
 Validate and compile the hardware examples:
 
@@ -245,9 +251,9 @@ By default, the repo validates:
 
 The full compile checks remain separate under the explicit compile commands.
 
-## ESPHome 2025.3.3 Notes
+## ESPHome 2026.3.0 Notes
 
-With local ESPHome `2025.3.3`, two practical details matter here:
+With local ESPHome `2026.3.0`, two practical details matter here:
 
 - the examples intentionally use explicit `substitutions` instead of relying on
   package defaults

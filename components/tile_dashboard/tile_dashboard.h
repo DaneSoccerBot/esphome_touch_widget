@@ -31,6 +31,7 @@
 #include <map>
 #include <functional>
 #include <cmath>
+#include <algorithm>
 #include <utility>
 #include "display_context.h"
 #include "tile.h"    // Tile base class + DisplayContext
@@ -259,11 +260,13 @@ private:
   /** Convert cell-local coordinates to tile-local coordinates for spanning tiles. */
   std::pair<uint16_t, uint16_t> span_local_(const Tile *t, uint8_t col, uint8_t row,
                                              uint16_t local_x, uint16_t local_y) const {
-    const int cell_w = ctx_.tile_w();
-    const int cell_h = ctx_.tile_h();
+    const int abs_x = ctx_.tile_x(col) + local_x;
+    const int abs_y = ctx_.tile_y(row) + local_y;
+    const int tile_x = ctx_.tile_x(t->col());
+    const int tile_y = ctx_.tile_y(t->row());
     return {
-      static_cast<uint16_t>((col - t->col()) * cell_w + local_x),
-      static_cast<uint16_t>((row - t->row()) * cell_h + local_y)
+      static_cast<uint16_t>(std::max(0, abs_x - tile_x)),
+      static_cast<uint16_t>(std::max(0, abs_y - tile_y))
     };
   }
 

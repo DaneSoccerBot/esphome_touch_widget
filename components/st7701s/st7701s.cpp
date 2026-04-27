@@ -61,8 +61,9 @@ void ST7701S::setup() {
 }
 
 void ST7701S::loop() {
-  if (this->handle_ != nullptr)
-    esp_lcd_rgb_panel_restart(this->handle_);
+  // The RGB engine is started by esp_lcd_panel_init(). Restarting it from every
+  // component loop can resync scanout mid-frame and produce thin horizontal
+  // artifacts, especially near the lower edge on 480x480 panels.
 }
 
 void ST7701S::draw_pixels_at(int x_start, int y_start, int w, int h, const uint8_t *ptr, display::ColorOrder order,

@@ -54,6 +54,8 @@ class PixelBuffer {
  public:
   ~PixelBuffer() { free_(); }
 
+  void release() { free_(); }
+
   /** Buffer allokieren/resizen. Gibt false zurück bei OOM. */
   bool ensure(int w, int h) {
     if (w == w_ && h == h_ && buf_) return true;
@@ -459,6 +461,8 @@ class PixelBuffer {
   bool valid() const { return buf_ != nullptr; }
   int width() const { return w_; }
   int height() const { return h_; }
+  uint16_t *row_data(int y) { return &buf_[y * w_]; }
+  const uint16_t *row_data(int y) const { return &buf_[y * w_]; }
 
  private:
   void free_() {

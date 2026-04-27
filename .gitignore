@@ -20,6 +20,15 @@ coverage.xml
 venv/
 .venv/
 
+# Lokale Debug-/Capture-Artefakte
+screenshots/
+tests/golden/
+dev-local/
+screenshot*.png
+current*.png
+panel_*.png
+capture*.png
+
 # Editor / OS
 .vscode/
 .idea/

@@ -101,14 +101,14 @@ protected:
         if (!formatted_equals(prev_top_, top_value_, fmt_top_.c_str(), top_unit_)) {
             auto [cx0, cy0, cx1, cy1] = top_value_clip();
             it.start_clipping(cx0, cy0, cx1, cy1);
-            ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
+            clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
             render_value(it, h * 0.2f, fmt_top_.c_str(), top_unit_, top_value_);
             it.end_clipping();
         }
         if (!formatted_equals(prev_bottom_, bottom_value_, fmt_bottom_.c_str(), bottom_unit_)) {
             auto [cx0, cy0, cx1, cy1] = bottom_value_clip();
             it.start_clipping(cx0, cy0, cx1, cy1);
-            ctx_.bg_renderer.drawBgColor(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
+            clear_area_fast(it, cx0, cy0, cx1 - cx0, cy1 - cy0);
             render_value(it, h * 0.7f, fmt_bottom_.c_str(), bottom_unit_, bottom_value_);
             it.end_clipping();
         }

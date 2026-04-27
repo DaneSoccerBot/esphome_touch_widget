@@ -6,6 +6,7 @@ substitutions:
   dashboard_font_file: ../assets/fonts/RobotoCondensed-Regular.ttf
   tile_dashboard_components_source: ../components
   touch_rotation: "0"
+  dashboard_display_rotation: "0"
   dashboard_width: "720"
   dashboard_height: "720"
   simulator_sdl_options: ""
@@ -23,6 +24,10 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
+          #ifdef USE_HOST
+          if (std::getenv("TILE_DASHBOARD_SIM_FREEZE_TICK") != nullptr)
+            return;
+          #endif
           id(sim_tick)++;
 
 sensor:

@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
 PLATFORMIO_CORE_DIR = ROOT / ".cache" / "platformio"
 TOOLING_BIN_DIR = ROOT / ".cache" / "tooling" / "bin"
+UV_CACHE_DIR = ROOT / ".cache" / "uv"
+XDG_CACHE_HOME = ROOT / ".cache"
 
 
 def bin_dir() -> Path:
@@ -174,8 +176,12 @@ def tooling_env(env: dict[str, str] | None = None) -> dict[str, str]:
     if env:
         merged.update(env)
     merged = build_platformio_env(merged)
+    merged.setdefault("UV_CACHE_DIR", str(UV_CACHE_DIR))
+    merged.setdefault("XDG_CACHE_HOME", str(XDG_CACHE_HOME))
+    merged.setdefault("COPYFILE_DISABLE", "1")
     platformio_core_dir = Path(merged["PLATFORMIO_CORE_DIR"])
     platformio_core_dir.mkdir(parents=True, exist_ok=True)
+    UV_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
         msys2_root = detect_windows_msys2_root()
         ensure_windows_sdl2_config_wrapper(msys2_root)

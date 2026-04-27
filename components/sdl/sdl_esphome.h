@@ -8,6 +8,8 @@
 #define SDL_MAIN_HANDLED
 #include "SDL.h"
 #include <map>
+#include <string>
+#include <vector>
 
 namespace esphome {
 namespace sdl {
@@ -72,6 +74,8 @@ class Sdl : public display::Display {
   int get_width_internal() override { return this->width_; }
   int get_height_internal() override { return this->height_; }
   void redraw_(SDL_Rect &rect);
+  void maybe_capture_snapshot_();
+  void save_snapshot_(const char *path);
   void transform_logical_to_physical_(int &x, int &y) const;
   SDL_Rect physical_rect_for_(int x, int y, int w, int h) const;
   int width_{};
@@ -82,6 +86,12 @@ class Sdl : public display::Display {
   SDL_Renderer *renderer_{};
   SDL_Window *window_{};
   SDL_Texture *texture_{};
+  std::vector<uint16_t> framebuffer_{};
+  std::string snapshot_path_{};
+  uint32_t snapshot_after_ms_{1000};
+  bool exit_after_snapshot_{false};
+  bool snapshot_written_{false};
+  uint32_t setup_ticks_{0};
   uint16_t x_low_{0};
   uint16_t y_low_{0};
   uint16_t x_high_{0};

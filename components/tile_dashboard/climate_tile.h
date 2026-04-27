@@ -13,6 +13,7 @@
 #include "tile.h"
 #include "colors.h"
 #include "pixel_buffer.h"
+#include "render_primitives.h"
 
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/api/homeassistant_service.h"
@@ -204,8 +205,10 @@ protected:
     const int thick = std::max(4, int(size * 0.09f));
     const int br = std::max(2, thick / 2);
 
-    // Ring — in PixelBuffer rendern, dann einmal blitten
-    float prog = std::clamp((tgt - cache_.min_t) / (cache_.max_t - cache_.min_t), 0.f, 1.f);
+    // Ring in einen Batch-Buffer rendern und danach zusammenhaengend blitten.
+    const float range = cache_.max_t - cache_.min_t;
+    float prog = range > 0.0f ? (tgt - cache_.min_t) / range : 0.0f;
+    prog = std::clamp(prog, 0.0f, 1.0f);
     constexpr float span = 270, start = 135;
     float filled = span * prog;
 
@@ -225,73 +228,66 @@ protected:
     static constexpr int MAX_BUF_PIXELS = 256 * 128;
     const bool fits_in_buffer = (buf_w * buf_h <= MAX_BUF_PIXELS);
 
+    const int buf_x = cx - extent;
+    const int buf_y = cy - extent;
+    const int bcx = cx - buf_x;
+    const int bcy = cy - buf_y;
+    const uint16_t bg565 = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
+    const uint16_t track565 = PixelBuffer::to_565(Colors::LIGHT_GREY);
+    const uint16_t fill565 = PixelBuffer::to_565(Colors::ORANGE);
+    const uint16_t marker565 = PixelBuffer::to_565(esphome::Color::WHITE);
+    const float outer_radius = arc_r + br;
+    const float inner_radius = std::max(1, arc_r - br);
+    const int marker_radius = br + 2;
+
     if (fits_in_buffer && arc_buf_.ensure(buf_w, buf_h)) {
       // --- Normaler Single-Buffer-Pfad (kleinere Arcs im Grid) ---
-      const int buf_x = cx - extent;
-      const int buf_y = cy - extent;
-      const int bcx = cx - buf_x;
-      const int bcy = cy - buf_y;
       arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
-      const uint16_t c_orange = PixelBuffer::to_565(Colors::ORANGE);
-      const uint16_t c_grey = PixelBuffer::to_565(Colors::LIGHT_GREY);
-      for (int i = 0; i < 100; i++) {
-        float deg = start + i * (span / 100);
-        float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
-        int px = bcx + std::cos(rad_f) * (radius - thick / 2);
-        int py = bcy + std::sin(rad_f) * (radius - thick / 2);
-        arc_buf_.filled_circle(px, py, br,
-                               (deg <= start + filled) ? c_orange : c_grey);
-      }
-
-      if (!std::isnan(tgt)) {
-        float mrad = (start + filled) * static_cast<float>(M_PI) / 180.0f;
-        int mx = bcx + std::cos(mrad) * (radius - thick / 2);
-        int my = bcy + std::sin(mrad) * (radius - thick / 2);
-        arc_buf_.filled_circle(mx, my, br + 2,
-                               PixelBuffer::to_565(esphome::Color::WHITE));
-      }
+      esphome::tile_dashboard::render::BatchPrimitives::draw_progress_arc(
+          arc_buf_,
+          esphome::tile_dashboard::render::ProgressArcSpec{
+              bcx,
+              bcy,
+              outer_radius,
+              inner_radius,
+              start,
+              span,
+              filled,
+              track565,
+              fill565,
+              !std::isnan(tgt),
+              filled,
+              marker_radius,
+              marker565,
+          });
 
       arc_buf_.blit(it, buf_x, buf_y);
     } else {
       // --- Strip-basierter Fallback: Arc in horizontale Streifen aufteilen ---
-      const int buf_x = cx - extent;
-      const int buf_y = cy - extent;
-      const int bcx_base = cx - buf_x;
-      const int bcy_base = cy - buf_y;
-
-      const uint16_t bg565 = PixelBuffer::to_565(Colors::TILE_BACKGROUND);
-      const uint16_t c_orange = PixelBuffer::to_565(Colors::ORANGE);
-      const uint16_t c_grey = PixelBuffer::to_565(Colors::LIGHT_GREY);
-      const uint16_t c_white = PixelBuffer::to_565(esphome::Color::WHITE);
+      const int bcx_base = bcx;
+      const int bcy_base = bcy;
       const float filled_val = filled;
-      const int arc_radius = radius;
-      const int arc_thick = thick;
-      const int arc_br = br;
 
       arc_buf_.blit_strips(it, buf_x, buf_y, buf_w, buf_h, MAX_BUF_PIXELS, bg565,
         [&](PixelBuffer &strip, int y_off) {
-          // Zeichne alle Track-Kreise die in diesen Streifen fallen
-          for (int i = 0; i < 100; i++) {
-            float deg = start + i * (span / 100);
-            float rad_f = deg * static_cast<float>(M_PI) / 180.0f;
-            int px = bcx_base + std::cos(rad_f) * (arc_radius - arc_thick / 2);
-            int py = bcy_base + std::sin(rad_f) * (arc_radius - arc_thick / 2) - y_off;
-            // Nur zeichnen wenn der Kreis diesen Streifen berührt
-            if (py + arc_br >= 0 && py - arc_br < strip.height()) {
-              strip.filled_circle(px, py, arc_br,
-                                  (deg <= start + filled_val) ? c_orange : c_grey);
-            }
-          }
-          // Marker
-          if (!std::isnan(tgt)) {
-            float mrad = (start + filled_val) * static_cast<float>(M_PI) / 180.0f;
-            int mx = bcx_base + std::cos(mrad) * (arc_radius - arc_thick / 2);
-            int my = bcy_base + std::sin(mrad) * (arc_radius - arc_thick / 2) - y_off;
-            if (my + (arc_br + 2) >= 0 && my - (arc_br + 2) < strip.height()) {
-              strip.filled_circle(mx, my, arc_br + 2, c_white);
-            }
-          }
+          esphome::tile_dashboard::render::BatchPrimitives::draw_progress_arc(
+              strip,
+              esphome::tile_dashboard::render::ProgressArcSpec{
+                  bcx_base,
+                  bcy_base - y_off,
+                  outer_radius,
+                  inner_radius,
+                  start,
+                  span,
+                  filled_val,
+                  track565,
+                  fill565,
+                  !std::isnan(tgt),
+                  filled_val,
+                  marker_radius,
+                  marker565,
+              });
         });
     }
     // Zahlen/Text

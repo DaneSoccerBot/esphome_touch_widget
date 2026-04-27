@@ -2,6 +2,9 @@
 #include "sdl_esphome.h"
 #include "esphome/components/display/display_color_utils.h"
 
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
 #include <vector>
 
 namespace {
@@ -12,6 +15,18 @@ inline uint16_t read_rgb565(const uint8_t *data, bool big_endian) {
   return static_cast<uint16_t>(data[0] | (data[1] << 8));
 }
 
+inline uint32_t env_u32(const char *name, uint32_t fallback) {
+  const char *value = std::getenv(name);
+  if (value == nullptr || value[0] == '\0')
+    return fallback;
+  return static_cast<uint32_t>(std::strtoul(value, nullptr, 10));
+}
+
+inline bool env_enabled(const char *name) {
+  const char *value = std::getenv(name);
+  return value != nullptr && value[0] != '\0' && value[0] != '0';
+}
+
 }  // namespace
 
 namespace esphome {
@@ -19,6 +34,12 @@ namespace sdl {
 
 void Sdl::setup() {
   SDL_Init(SDL_INIT_VIDEO);
+  this->setup_ticks_ = SDL_GetTicks();
+  this->framebuffer_.assign(static_cast<size_t>(this->width_) * this->height_, 0);
+  if (const char *snapshot_path = std::getenv("TILE_DASHBOARD_SDL_SNAPSHOT"))
+    this->snapshot_path_ = snapshot_path;
+  this->snapshot_after_ms_ = env_u32("TILE_DASHBOARD_SDL_CAPTURE_AFTER_MS", 1000);
+  this->exit_after_snapshot_ = env_enabled("TILE_DASHBOARD_SDL_EXIT_AFTER_SNAPSHOT");
   this->window_ = SDL_CreateWindow(App.get_name().c_str(), this->pos_x_, this->pos_y_, this->width_, this->height_,
                                    this->window_options_);
   this->renderer_ = SDL_CreateRenderer(this->window_, -1, SDL_RENDERER_SOFTWARE);
@@ -47,6 +68,36 @@ void Sdl::update() {
 void Sdl::redraw_(SDL_Rect &rect) {
   SDL_RenderCopy(this->renderer_, this->texture_, &rect, &rect);
   SDL_RenderPresent(this->renderer_);
+}
+
+void Sdl::save_snapshot_(const char *path) {
+  std::ofstream out(path, std::ios::binary);
+  if (!out) {
+    ESP_LOGE(TAG, "Unable to write simulator snapshot: %s", path);
+    return;
+  }
+
+  out << "P6\n" << this->width_ << " " << this->height_ << "\n255\n";
+  for (uint16_t pixel : this->framebuffer_) {
+    const uint8_t r = static_cast<uint8_t>(((pixel >> 11) & 0x1F) * 255 / 31);
+    const uint8_t g = static_cast<uint8_t>(((pixel >> 5) & 0x3F) * 255 / 63);
+    const uint8_t b = static_cast<uint8_t>((pixel & 0x1F) * 255 / 31);
+    out.put(static_cast<char>(r));
+    out.put(static_cast<char>(g));
+    out.put(static_cast<char>(b));
+  }
+  ESP_LOGI(TAG, "Simulator snapshot written: %s", path);
+}
+
+void Sdl::maybe_capture_snapshot_() {
+  if (this->snapshot_path_.empty() || this->snapshot_written_)
+    return;
+  if (SDL_GetTicks() - this->setup_ticks_ < this->snapshot_after_ms_)
+    return;
+  this->save_snapshot_(this->snapshot_path_.c_str());
+  this->snapshot_written_ = true;
+  if (this->exit_after_snapshot_)
+    exit(0);
 }
 
 void Sdl::transform_logical_to_physical_(int &x, int &y) const {
@@ -124,6 +175,11 @@ void Sdl::draw_pixels_at(int x_start, int y_start, int w, int h, const uint8_t *
     }
 
     SDL_UpdateTexture(this->texture_, &rect, bulk.data(), rect.w * 2);
+    for (int row = 0; row < rect.h; row++) {
+      const size_t dst = static_cast<size_t>(rect.y + row) * this->width_ + rect.x;
+      const size_t src = static_cast<size_t>(row) * rect.w;
+      std::copy_n(&bulk[src], rect.w, &this->framebuffer_[dst]);
+    }
   } else {
     Display::draw_pixels_at(x_start, y_start, w, h, ptr, order, bitness, big_endian, x_offset, y_offset, x_pad);
   }
@@ -138,6 +194,7 @@ void Sdl::draw_pixel_at(int x, int y, Color color) {
   SDL_Rect rect{x, y, 1, 1};
   auto data = (display::ColorUtil::color_to_565(color, display::COLOR_ORDER_RGB));
   SDL_UpdateTexture(this->texture_, &rect, &data, 2);
+  this->framebuffer_[static_cast<size_t>(y) * this->width_ + x] = data;
   if (x < this->x_low_)
     this->x_low_ = x;
   if (y < this->y_low_)
@@ -155,6 +212,7 @@ void Sdl::process_key(uint32_t keycode, bool down) {
 }
 
 void Sdl::loop() {
+  this->maybe_capture_snapshot_();
   SDL_Event e;
   if (SDL_PollEvent(&e)) {
     switch (e.type) {

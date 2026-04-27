@@ -305,10 +305,10 @@ protected:
                                 rounded ? radius : 0, border);
   }
 
-  int tile_w() const { return override_geo_ ? override_geo_->w : ctx_.tile_w() * colspan_; }
-  int tile_h() const { return override_geo_ ? override_geo_->h : ctx_.tile_h() * rowspan_; }
-  int abs_x() const { return override_geo_ ? override_geo_->x : ctx_.x0 + (col_ - 1) * ctx_.tile_w(); }
-  int abs_y() const { return override_geo_ ? override_geo_->y : ctx_.y0 + (row_ - 1) * ctx_.tile_h(); }
+  int tile_w() const { return override_geo_ ? override_geo_->w : ctx_.tile_span_w(col_, colspan_); }
+  int tile_h() const { return override_geo_ ? override_geo_->h : ctx_.tile_span_h(row_, rowspan_); }
+  int abs_x() const { return override_geo_ ? override_geo_->x : ctx_.tile_x(col_); }
+  int abs_y() const { return override_geo_ ? override_geo_->y : ctx_.tile_y(row_); }
   int tile_index() const { return tile_idx_; }
 
 protected:

@@ -17,8 +17,6 @@ esphome:
   project:
     name: ${project_name}
     version: ${project_version}
-  includes:
-    - ../scripts/screenshot_helper.h
 
 logger:
   level: ${logger_level}
@@ -77,11 +75,6 @@ interval:
             id(climate_zone_b_payload).update();
             seeded = true;
           }
-  - interval: 200ms
-    then:
-      - lambda: |-
-          screenshot_helper::process_commands(id(dashboard_display), id(dashboard_ui).get_dashboard());
-
 # --- Sensoren (update_interval: never → nur via Round-Robin) ---
 
 sensor:

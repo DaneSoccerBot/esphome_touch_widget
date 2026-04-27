@@ -56,13 +56,19 @@ inline TouchMapping map_touch(int x, int y, int width, int height,
   mapped.rotated_x = std::clamp(mapped.rotated_x, 0, width - 1);
   mapped.rotated_y = std::clamp(mapped.rotated_y, 0, height - 1);
 
-  const int tile_w = std::max(width / cols, 1);
-  const int tile_h = std::max(height / rows, 1);
+  const int col0 = std::clamp((mapped.rotated_x * cols) / width, 0, cols - 1);
+  const int row0 = std::clamp((mapped.rotated_y * rows) / height, 0, rows - 1);
+  const int cell_x0 = (width * col0) / cols;
+  const int cell_x1 = (width * (col0 + 1)) / cols;
+  const int cell_y0 = (height * row0) / rows;
+  const int cell_y1 = (height * (row0 + 1)) / rows;
+  const int cell_w = std::max(cell_x1 - cell_x0, 1);
+  const int cell_h = std::max(cell_y1 - cell_y0, 1);
 
-  mapped.col = std::clamp(mapped.rotated_x / tile_w + 1, 1, cols);
-  mapped.row = std::clamp(mapped.rotated_y / tile_h + 1, 1, rows);
-  mapped.local_x = std::clamp(mapped.rotated_x % tile_w, 0, tile_w - 1);
-  mapped.local_y = std::clamp(mapped.rotated_y % tile_h, 0, tile_h - 1);
+  mapped.col = col0 + 1;
+  mapped.row = row0 + 1;
+  mapped.local_x = std::clamp(mapped.rotated_x - cell_x0, 0, cell_w - 1);
+  mapped.local_y = std::clamp(mapped.rotated_y - cell_y0, 0, cell_h - 1);
   mapped.local_x_raw = std::clamp(mapped.rotated_x, 0, width - 1);
   mapped.local_y_raw = std::clamp(mapped.rotated_y, 0, height - 1);
   return mapped;

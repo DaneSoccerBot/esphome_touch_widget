@@ -18,6 +18,7 @@
 #ifndef DISPLAY_CONTEXT_H
 #define DISPLAY_CONTEXT_H
 
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -67,8 +68,46 @@ struct DisplayContext
     // ------------------------------------------------------------------------
     // Helper-Funktionen
     // ------------------------------------------------------------------------
-    int tile_w() const { return scr_w / cols; }
-    int tile_h() const { return scr_h / rows; }
+    int tile_w() const { return scr_w / std::max(cols, 1); }
+    int tile_h() const { return scr_h / std::max(rows, 1); }
+
+    int grid_x(int zero_based_col) const
+    {
+        const int safe_cols = std::max(cols, 1);
+        zero_based_col = std::clamp(zero_based_col, 0, safe_cols);
+        return x0 + (scr_w * zero_based_col) / safe_cols;
+    }
+
+    int grid_y(int zero_based_row) const
+    {
+        const int safe_rows = std::max(rows, 1);
+        zero_based_row = std::clamp(zero_based_row, 0, safe_rows);
+        return y0 + (scr_h * zero_based_row) / safe_rows;
+    }
+
+    int tile_x(uint8_t col) const
+    {
+        return grid_x(std::max<int>(col, 1) - 1);
+    }
+
+    int tile_y(uint8_t row) const
+    {
+        return grid_y(std::max<int>(row, 1) - 1);
+    }
+
+    int tile_span_w(uint8_t col, uint8_t colspan) const
+    {
+        const int start = std::max<int>(col, 1) - 1;
+        const int end = start + std::max<int>(colspan, 1);
+        return std::max(0, grid_x(end) - grid_x(start));
+    }
+
+    int tile_span_h(uint8_t row, uint8_t rowspan) const
+    {
+        const int start = std::max<int>(row, 1) - 1;
+        const int end = start + std::max<int>(rowspan, 1);
+        return std::max(0, grid_y(end) - grid_y(start));
+    }
 
     /**
      *  Liefert abhängig von der geforderten Punktgröße den passenden Roboto-Font

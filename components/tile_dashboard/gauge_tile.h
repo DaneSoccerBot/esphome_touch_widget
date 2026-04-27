@@ -2,7 +2,6 @@
 #define GAUGE_TILE_H
 
 #include <tuple>
-#include <vector>
 #include <utility>
 #include <cmath>
 #include <algorithm>
@@ -10,6 +9,7 @@
 #include "tile.h"
 #include "colors.h" // Farbkonstanten
 #include "pixel_buffer.h"
+#include "render_primitives.h"
 #include "esphome/components/sensor/sensor.h"
 
 using esphome::display::Display;
@@ -117,13 +117,19 @@ protected:
       if (fits_in_buffer && arc_buf_.ensure(buf_w, buf_h)) {
         arc_buf_.clear(PixelBuffer::to_565(Colors::TILE_BACKGROUND));
 
-        // Kombinierter Single-Pass: Track + Fill + Inner Circle
-        arc_buf_.draw_gauge_arc(bcx, bcy, radius, inner_radius,
-                                start_angle, start_angle + angle_range,
-                                filled_angle,
-                                PixelBuffer::to_565(Colors::SCREEN_BACKGROUND),
-                                PixelBuffer::to_565(fill_color),
-                                PixelBuffer::to_565(Colors::TILE_BACKGROUND));
+        esphome::tile_dashboard::render::BatchPrimitives::draw_progress_arc(
+            arc_buf_,
+            esphome::tile_dashboard::render::ProgressArcSpec{
+                bcx,
+                bcy,
+                radius,
+                inner_radius,
+                start_angle,
+                angle_range,
+                angle_range * frac,
+                PixelBuffer::to_565(Colors::SCREEN_BACKGROUND),
+                PixelBuffer::to_565(fill_color),
+            });
 
         arc_buf_.blit(it, buf_x, buf_y);
       } else {
@@ -138,9 +144,19 @@ protected:
         arc_buf_.blit_strips(it, buf_x, buf_y, buf_w, buf_h, MAX_BUF_PIXELS, bg565,
           [&](PixelBuffer &strip, int y_off) {
             const int shifted_cy = bcy_l - y_off;
-            strip.draw_gauge_arc(bcx_l, shifted_cy, or_, ir,
-                                 sa, ea_full, ea_fill,
-                                 track565, fill565, bg565);
+            esphome::tile_dashboard::render::BatchPrimitives::draw_progress_arc(
+                strip,
+                esphome::tile_dashboard::render::ProgressArcSpec{
+                    bcx_l,
+                    shifted_cy,
+                    or_,
+                    ir,
+                    sa,
+                    ea_full - sa,
+                    ea_fill - sa,
+                    track565,
+                    fill565,
+                });
           });
       }
 
@@ -220,50 +236,6 @@ private:
     const int left = abs_x() + tile_w() * 0.05f;
     const int right = abs_x() + tile_w() * 0.95f;
     return {left, top, right, bot};
-  }
-
-  // Arc-Segment helper
-  void draw_arc_segment(Display &it,
-                        int cx, int cy,
-                        float outer_r, float inner_r,
-                        float start_deg, float end_deg,
-                        esphome::Color color) const
-  {
-    const int segs = 60;
-    if (end_deg <= start_deg)
-      return;
-    float start_rad = start_deg * M_PI / 180.0f;
-    float end_rad = end_deg * M_PI / 180.0f;
-    std::vector<std::pair<int, int>> pts;
-
-    // outer arc
-    for (int i = 0; i <= segs; ++i)
-    {
-      float ang = start_rad + (end_rad - start_rad) * (i / (float)segs);
-      float rx = cx + cosf(ang) * outer_r;
-      float ry = cy + sinf(ang) * outer_r;
-      if (std::isfinite(rx) && std::isfinite(ry))
-        pts.emplace_back(int(rx), int(ry));
-    }
-    // inner arc backwards
-    for (int i = segs; i >= 0; --i)
-    {
-      float ang = start_rad + (end_rad - start_rad) * (i / (float)segs);
-      float rx = cx + cosf(ang) * inner_r;
-      float ry = cy + sinf(ang) * inner_r;
-      if (std::isfinite(rx) && std::isfinite(ry))
-        pts.emplace_back(int(rx), int(ry));
-    }
-    if (pts.size() >= 3)
-    {
-      for (size_t i = 1; i + 1 < pts.size(); ++i)
-      {
-        it.filled_triangle(pts[0].first, pts[0].second,
-                           pts[i].first, pts[i].second,
-                           pts[i + 1].first, pts[i + 1].second,
-                           color);
-      }
-    }
   }
 };
 
