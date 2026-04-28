@@ -72,6 +72,7 @@ class TileDashboardE2ETests(unittest.TestCase):
         self.assertIn("tile_dashboard:", stdout)
         self.assertIn("project_name: esphome.touch_widget", stdout)
         self.assertIn("tile_dashboard_components_source: ../components", stdout)
+        self.assertIn("- st7701s", stdout)
         self.assertNotIn("packages/layouts", stdout)
         self.assertNotIn("packages/apps", stdout)
 
