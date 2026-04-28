@@ -50,6 +50,10 @@ class ST7701S : public display::Display,
   void set_width(uint16_t width) { this->width_ = width; }
   void set_pclk_frequency(uint32_t pclk_frequency) { this->pclk_frequency_ = pclk_frequency; }
   void set_pclk_inverted(bool inverted) { this->pclk_inverted_ = inverted; }
+  void set_bounce_buffer_lines(uint16_t lines) { this->bounce_buffer_lines_ = lines; }
+  void set_dma_burst_size(uint16_t size) { this->dma_burst_size_ = size; }
+  void set_num_framebuffers(uint8_t num_fbs) { this->num_fbs_ = num_fbs; }
+  void set_bb_invalidate_cache(bool invalidate) { this->bb_invalidate_cache_ = invalidate; }
   void set_dimensions(uint16_t width, uint16_t height) {
     this->width_ = width;
     this->height_ = height;
@@ -97,6 +101,10 @@ class ST7701S : public display::Display,
   std::vector<uint8_t> init_sequence_;
   uint32_t pclk_frequency_ = 16 * 1000 * 1000;
   bool pclk_inverted_{true};
+  uint16_t bounce_buffer_lines_{10};
+  uint16_t dma_burst_size_{0};
+  uint8_t num_fbs_{1};
+  bool bb_invalidate_cache_{false};
 
   bool invert_colors_{};
   display::ColorOrder color_mode_{display::COLOR_ORDER_BGR};

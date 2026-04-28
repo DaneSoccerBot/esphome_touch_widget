@@ -4,6 +4,18 @@ substitutions:
   dashboard_display_mirror_y: "false"
   dashboard_touch_mirror_x: "false"
   dashboard_touch_mirror_y: "false"
+  dashboard_pclk_frequency: "10MHz"
+  dashboard_pclk_inverted: "false"
+  dashboard_hsync_pulse_width: "8"
+  dashboard_hsync_front_porch: "10"
+  dashboard_hsync_back_porch: "20"
+  dashboard_vsync_pulse_width: "8"
+  dashboard_vsync_front_porch: "10"
+  dashboard_vsync_back_porch: "10"
+  dashboard_rgb_bounce_buffer_lines: "40"
+  dashboard_rgb_dma_burst_size: "64"
+  dashboard_rgb_num_framebuffers: "1"
+  dashboard_rgb_bb_invalidate_cache: "false"
 
 i2c:
   - id: bus_a
@@ -27,6 +39,7 @@ esp32:
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_SPIRAM_XIP_FROM_PSRAM: "y"
       CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
       CONFIG_SPIRAM_RODATA: y
 
@@ -89,14 +102,18 @@ display:
       - 1
       - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x10]
       - [0xCD, 0x00]
-    pclk_frequency: 12MHz
-    pclk_inverted: false
-    hsync_pulse_width: 8
-    hsync_front_porch: 10
-    hsync_back_porch: 20
-    vsync_pulse_width: 8
-    vsync_front_porch: 10
-    vsync_back_porch: 10
+    pclk_frequency: ${dashboard_pclk_frequency}
+    pclk_inverted: ${dashboard_pclk_inverted}
+    bounce_buffer_lines: ${dashboard_rgb_bounce_buffer_lines}
+    dma_burst_size: ${dashboard_rgb_dma_burst_size}
+    num_framebuffers: ${dashboard_rgb_num_framebuffers}
+    bb_invalidate_cache: ${dashboard_rgb_bb_invalidate_cache}
+    hsync_pulse_width: ${dashboard_hsync_pulse_width}
+    hsync_front_porch: ${dashboard_hsync_front_porch}
+    hsync_back_porch: ${dashboard_hsync_back_porch}
+    vsync_pulse_width: ${dashboard_vsync_pulse_width}
+    vsync_front_porch: ${dashboard_vsync_front_porch}
+    vsync_back_porch: ${dashboard_vsync_back_porch}
     data_pins:
       red: [11, 12, 13, 14, 0]
       green: [8, 20, 3, 46, 9, 10]

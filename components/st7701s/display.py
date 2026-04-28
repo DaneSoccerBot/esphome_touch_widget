@@ -46,6 +46,11 @@ from .init_sequences import ST7701S_INITS, cmd
 
 DEPENDENCIES = ["spi", "esp32"]
 
+CONF_BB_INVALIDATE_CACHE = "bb_invalidate_cache"
+CONF_BOUNCE_BUFFER_LINES = "bounce_buffer_lines"
+CONF_DMA_BURST_SIZE = "dma_burst_size"
+CONF_NUM_FRAMEBUFFERS = "num_framebuffers"
+
 st7701s_ns = cg.esphome_ns.namespace("st7701s")
 ST7701S = st7701s_ns.class_("ST7701S", display.Display, cg.Component, spi.SPIDevice)
 ColorOrder = display.display_ns.enum("ColorMode")
@@ -147,6 +152,16 @@ CONFIG_SCHEMA = cv.All(
                 cv.Optional(CONF_VSYNC_PULSE_WIDTH, default=10): cv.int_,
                 cv.Optional(CONF_VSYNC_BACK_PORCH, default=10): cv.int_,
                 cv.Optional(CONF_VSYNC_FRONT_PORCH, default=10): cv.int_,
+                cv.Optional(CONF_BOUNCE_BUFFER_LINES, default=10): cv.int_range(
+                    min=0, max=120
+                ),
+                cv.Optional(CONF_DMA_BURST_SIZE, default=0): cv.one_of(
+                    0, 8, 16, 32, 64, 128, int=True
+                ),
+                cv.Optional(CONF_NUM_FRAMEBUFFERS, default=1): cv.int_range(
+                    min=1, max=3
+                ),
+                cv.Optional(CONF_BB_INVALIDATE_CACHE, default=False): cv.boolean,
             }
         ).extend(spi.spi_device_schema(cs_pin_required=False, default_data_rate=1e6))
     ),
@@ -181,6 +196,10 @@ async def to_code(config):
     cg.add(var.set_vsync_front_porch(config[CONF_VSYNC_FRONT_PORCH]))
     cg.add(var.set_pclk_inverted(config[CONF_PCLK_INVERTED]))
     cg.add(var.set_pclk_frequency(config[CONF_PCLK_FREQUENCY]))
+    cg.add(var.set_bounce_buffer_lines(config[CONF_BOUNCE_BUFFER_LINES]))
+    cg.add(var.set_dma_burst_size(config[CONF_DMA_BURST_SIZE]))
+    cg.add(var.set_num_framebuffers(config[CONF_NUM_FRAMEBUFFERS]))
+    cg.add(var.set_bb_invalidate_cache(config[CONF_BB_INVALIDATE_CACHE]))
     dpins = []
     if CONF_RED in config[CONF_DATA_PINS]:
         red_pins = config[CONF_DATA_PINS][CONF_RED]

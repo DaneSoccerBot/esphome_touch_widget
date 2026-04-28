@@ -27,8 +27,10 @@ void ST7701S::setup() {
 
   esp_lcd_rgb_panel_config_t config{};
   config.flags.fb_in_psram = 1;
-  config.bounce_buffer_size_px = this->width_ * 10;
-  config.num_fbs = 1;
+  config.flags.bb_invalidate_cache = this->bb_invalidate_cache_;
+  config.bounce_buffer_size_px = this->width_ * this->bounce_buffer_lines_;
+  config.dma_burst_size = this->dma_burst_size_;
+  config.num_fbs = this->num_fbs_;
   config.timings.h_res = this->width_;
   config.timings.v_res = this->height_;
   config.timings.hsync_pulse_width = this->hsync_pulse_width_;
@@ -50,6 +52,14 @@ void ST7701S::setup() {
   config.vsync_gpio_num = this->vsync_pin_->get_pin();
   config.de_gpio_num = this->de_pin_->get_pin();
   config.pclk_gpio_num = this->pclk_pin_->get_pin();
+  ESP_LOGI(TAG,
+           "patched ST7701S RGB setup: %ux%u pclk=%uHz inv=%s h(%u,%u,%u) v(%u,%u,%u) "
+           "fb=%u bounce=%u lines dma_burst=%u bb_invalidate=%s",
+           this->width_, this->height_, this->pclk_frequency_, this->pclk_inverted_ ? "Y" : "N",
+           this->hsync_pulse_width_, this->hsync_back_porch_, this->hsync_front_porch_,
+           this->vsync_pulse_width_, this->vsync_back_porch_, this->vsync_front_porch_,
+           this->num_fbs_, this->bounce_buffer_lines_, this->dma_burst_size_,
+           this->bb_invalidate_cache_ ? "Y" : "N");
   esp_err_t err = esp_lcd_new_rgb_panel(&config, &this->handle_);
   if (err != ESP_OK) {
     esph_log_e(TAG, "lcd_new_rgb_panel failed: %s", esp_err_to_name(err));
@@ -262,6 +272,20 @@ void ST7701S::dump_config() {
     ESP_LOGCONFIG(TAG, "  Data pin %d: %s", static_cast<int>(i), pin_summary);
   }
   ESP_LOGCONFIG(TAG, "  SPI Data rate: %dMHz", (unsigned) (this->data_rate_ / 1000000));
+  ESP_LOGCONFIG(TAG,
+                "  Patched driver: yes\n"
+                "  PCLK: %uHz inverted=%s\n"
+                "  RGB timing H(pulse/back/front): %u/%u/%u\n"
+                "  RGB timing V(pulse/back/front): %u/%u/%u\n"
+                "  Framebuffers: %u\n"
+                "  Bounce buffer lines: %u\n"
+                "  DMA burst size: %u\n"
+                "  Bounce invalidate cache: %s",
+                this->pclk_frequency_, this->pclk_inverted_ ? "yes" : "no",
+                this->hsync_pulse_width_, this->hsync_back_porch_, this->hsync_front_porch_,
+                this->vsync_pulse_width_, this->vsync_back_porch_, this->vsync_front_porch_,
+                this->num_fbs_, this->bounce_buffer_lines_, this->dma_burst_size_,
+                this->bb_invalidate_cache_ ? "yes" : "no");
 }
 
 }  // namespace st7701s
