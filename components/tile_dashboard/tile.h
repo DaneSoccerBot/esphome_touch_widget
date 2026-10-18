@@ -101,7 +101,7 @@ public:
     if (!need_redraw)
       return;
 
-      ESP_LOGD("tile",
+    ESP_LOGD("tile",
              "draw() tile[%d] @%d,%d -> %s (old='%s', new='%s')",
              idx, col_, row_,
              is_initial    ? "INITIAL"
@@ -120,12 +120,12 @@ public:
 #ifdef USE_ESP32
       const long psram_delta = (long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM) - (long)psram_before;
       ESP_LOGI("tile", "FULL %s[%d] @%d,%d %ums fs=%s %dx%d psram=%+ld",
-               tile_type_name(), idx, col_, row_, dt,
+               tile_type_name(), idx, col_, row_, (unsigned) dt,
                is_fullscreen() ? "Y" : "N",
                tile_w(), tile_h(), psram_delta);
 #else
       ESP_LOGI("tile", "FULL %s[%d] @%d,%d %ums fs=%s %dx%d",
-               tile_type_name(), idx, col_, row_, dt,
+               tile_type_name(), idx, col_, row_, (unsigned) dt,
                is_fullscreen() ? "Y" : "N",
                tile_w(), tile_h());
 #endif
@@ -136,7 +136,7 @@ public:
       render_update(it);
       const uint32_t dt = esphome::millis() - t0;
       ESP_LOGD("tile", "UPD  %s[%d] @%d,%d %ums",
-               tile_type_name(), idx, col_, row_, dt);
+               tile_type_name(), idx, col_, row_, (unsigned) dt);
     }
 
     // 6) Cache aktualisieren
@@ -258,7 +258,8 @@ protected:
     it.end_clipping();
     uint32_t t3 = esphome::millis();
     ESP_LOGI("tile", "  breakdown %s[%d]: bg_blit=%u lbl=%u content=%u ms",
-             tile_type_name(), tile_idx_, t1 - t0, t2 - t1, t3 - t2);
+             tile_type_name(), tile_idx_, (unsigned) (t1 - t0), (unsigned) (t2 - t1),
+             (unsigned) (t3 - t2));
   }
   virtual void render_update(Display &it)
   {

@@ -301,7 +301,7 @@ class PixelBuffer {
     const uint32_t dt = esphome::millis() - t0;
     if (dt > 2) {
       ESP_LOGD("pbuf", "blit %dx%d @%d,%d -> %dx%d @%d,%d %ums",
-               w_, h_, x, y, draw_w, draw_h, dst_x, dst_y, dt);
+               w_, h_, x, y, draw_w, draw_h, dst_x, dst_y, (unsigned) dt);
     }
   }
 
@@ -344,7 +344,7 @@ class PixelBuffer {
     }
     const uint32_t dt = esphome::millis() - t0;
     ESP_LOGD("pbuf", "blit_strips %dx%d %u strips %ums",
-             total_w, total_h, n_strips, dt);
+             total_w, total_h, n_strips, (unsigned) dt);
     return true;
   }
 

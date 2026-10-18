@@ -1,9 +1,16 @@
 import os
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+from tooling import tooling_env  # noqa: E402
+
 ESPHOME_BIN = ROOT / ".venv" / ("Scripts" if os.name == "nt" else "bin") / (
     "esphome.exe" if os.name == "nt" else "esphome"
 )
@@ -16,6 +23,9 @@ class TileDashboardE2ETests(unittest.TestCase):
         result = subprocess.run(
             [str(ESPHOME_BIN), *args],
             cwd=ROOT,
+            # Same PlatformIO core dir as scripts/dev.py, so shared build dirs
+            # under examples/.esphome/build never mix two framework-espidf trees.
+            env=tooling_env(),
             capture_output=True,
             text=True,
         )

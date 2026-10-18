@@ -359,13 +359,13 @@ class TileDashboardComponent : public Component, public touchscreen::TouchListen
     const long heap_d = (long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL) - (long)heap0;
     const long psram_d = (long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM) - (long)psram0;
     ESP_LOGI(TAG, "render_() %ums fs=%s page=%u tiles=%u heap=%+ld psram=%+ld",
-             dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
+             (unsigned) dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
              this->dashboard_.active_page(),
              (unsigned)this->dashboard_.visible_tile_count(),
              heap_d, psram_d);
 #else
     ESP_LOGI(TAG, "render_() %ums fs=%s page=%u tiles=%u",
-             dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
+             (unsigned) dt, this->dashboard_.is_fullscreen() ? "Y" : "N",
              this->dashboard_.active_page(),
              (unsigned)this->dashboard_.visible_tile_count());
 #endif
