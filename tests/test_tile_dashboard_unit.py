@@ -26,6 +26,38 @@ from components.tile_dashboard.config import (  # noqa: E402
 FONT_FILE = {"path": "../assets/fonts/RobotoCondensed-Regular.ttf", "type": "local"}
 PIXEL_BUFFER_HEADER = ROOT / "components/tile_dashboard/pixel_buffer.h"
 SDL_ESPHOME_CPP = ROOT / "components/sdl/sdl_esphome.cpp"
+ST7701S_CPP = ROOT / "components/st7701s/st7701s.cpp"
+
+
+def st7701s_draw_pixels_at(width, height, rotation, x_start, y_start, buf):
+    """Python-Modell von ST7701S::draw_pixels_at: liefert {(phys_x, phys_y): pixel}."""
+    h = len(buf)
+    w = len(buf[0])
+    if rotation in (90, 270):
+        out_w, out_h = h, w
+    else:
+        out_w, out_h = w, h
+
+    phys_x, phys_y = x_start, y_start
+    if rotation == 90:
+        phys_x, phys_y = width - (y_start + h), x_start
+    elif rotation == 180:
+        phys_x, phys_y = width - (x_start + w), height - (y_start + h)
+    elif rotation == 270:
+        phys_x, phys_y = y_start, height - (x_start + w)
+
+    pixels = {}
+    for out_y in range(out_h):
+        for out_x in range(out_w):
+            src_x, src_y = out_x, out_y
+            if rotation == 90:
+                src_x, src_y = out_y, h - 1 - out_x
+            elif rotation == 180:
+                src_x, src_y = w - 1 - out_x, h - 1 - out_y
+            elif rotation == 270:
+                src_x, src_y = w - 1 - out_y, out_x
+            pixels[(phys_x + out_x, phys_y + out_y)] = buf[src_y][src_x]
+    return pixels
 
 
 def rgb565(red, green, blue):
@@ -347,16 +379,35 @@ class TileDashboardUnitTests(unittest.TestCase):
         self.assertIn("disp.get_clipping()", header)
         self.assertRegex(header, re.compile(r"draw_pixels_at\([\s\S]*src_x_offset, src_y_offset, src_x_pad\)"))
 
-    def test_pixelbuffer_blit_bypasses_driver_bulk_path_when_rotated(self):
+    def test_pixelbuffer_blit_leaves_rotation_to_display_driver(self):
         header = PIXEL_BUFFER_HEADER.read_text()
 
-        self.assertIn("const auto rotation = disp.get_rotation();", header)
-        self.assertIn("uint16_t *rot_buf = pixel_buffer_detail::alloc_pixels(rot_pixels);", header)
-        self.assertIn("phys_x = canvas_w - (dst_y + draw_h);", header)
-        self.assertIn("phys_y = canvas_h - (dst_x + draw_w);", header)
-        self.assertIn("rot_buf[static_cast<size_t>(out_y) * out_w + out_x] = buf_[src_index];", header)
-        self.assertIn("pixel_buffer_detail::free_pixels(rot_buf);", header)
-        self.assertIn("disp.esphome::display::Display::draw_pixels_at(", header)
+        # Der ST7701S-Treiber dreht in draw_pixels_at selbst. Eine Vor-Rotation
+        # im PixelBuffer fuehrt auf der Hardware zu doppelter Rotation.
+        self.assertNotIn("disp.get_rotation()", header)
+        self.assertNotIn("rot_buf", header)
+
+    def test_st7701s_driver_rotates_in_draw_pixels_at(self):
+        source = ST7701S_CPP.read_text()
+
+        self.assertIn("const auto rotation = this->rotation_;", source)
+        self.assertIn("phys_x = static_cast<int>(this->width_) - (y_start + h);", source)
+
+    def test_rotated_blit_matches_per_pixel_drawing(self):
+        width, height = 12, 10
+        buf_w, buf_h = 4, 3
+        buf = [[(y * buf_w + x) + 1 for x in range(buf_w)] for y in range(buf_h)]
+
+        for rotation in (0, 90, 180, 270):
+            with self.subTest(rotation=rotation):
+                blitted = st7701s_draw_pixels_at(width, height, rotation, 5, 2, buf)
+                per_pixel = {}
+                for y in range(buf_h):
+                    for x in range(buf_w):
+                        per_pixel.update(
+                            st7701s_draw_pixels_at(width, height, rotation, 5 + x, 2 + y, [[buf[y][x]]])
+                        )
+                self.assertEqual(blitted, per_pixel)
 
     def test_sdl_draw_pixels_at_keeps_rgb565_bulk_path_when_rotated(self):
         source = SDL_ESPHOME_CPP.read_text()
