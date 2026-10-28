@@ -16,7 +16,7 @@
 #include "render_primitives.h"
 
 #include "esphome/components/text_sensor/text_sensor.h"
-#include "esphome/components/api/homeassistant_service.h"
+#include "ha_action.h"
 
 using esphome::display::Display;
 using esphome::font::Font;
@@ -455,12 +455,8 @@ private:
     }
     cache_.last_sent_target = cache_.target;
     ESP_LOGD("Climate", "Sending target %.1f to Home Assistant", cache_.target);
-    api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);
-    call.set_service("climate.set_temperature");
-    call.init_data(2);
-    call.add_data("entity_id", cfg_.entity_id);
-    call.add_data("temperature", esphome::to_string(cache_.target));
-    call.play();
+    tile_dashboard_ha::call_action("climate.set_temperature",
+                                    {{"entity_id", cfg_.entity_id}, {"temperature", esphome::to_string(cache_.target)}});
   }
 
   void toggle_mode()
@@ -474,12 +470,7 @@ private:
     cache_.mode = next;
     ESP_LOGD("Climate", "Toggling mode to %s", next.c_str());
     publish_state_to_payload_();
-    api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);
-    call.set_service("climate.set_hvac_mode");
-    call.init_data(2);
-    call.add_data("entity_id", cfg_.entity_id);
-    call.add_data("hvac_mode", next);
-    call.play();
+    tile_dashboard_ha::call_action("climate.set_hvac_mode", {{"entity_id", cfg_.entity_id}, {"hvac_mode", next}});
   }
 
   // Max Distanz (px²) zwischen Touch-Down und Touch-Up für einen gültigen Tap

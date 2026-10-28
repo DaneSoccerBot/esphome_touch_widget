@@ -6,7 +6,7 @@
 #include "colors.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/api/api_server.h"
-#include "esphome/components/api/homeassistant_service.h"
+#include "ha_action.h"
 #include "switch_icon_renderer.h"
 
 using esphome::font::Font;
@@ -83,24 +83,9 @@ private:
     ESP_LOGD("Switch", "Setting switch state to %s", on ? "OFF" : "ON");
     request_redraw();
 
-    api::HomeAssistantServiceCallAction<> svc(api::global_api_server, false);
-    if (!on)
-    { // → Einschalten
-      ESP_LOGD("Light", "Toggling lights ON");
-      svc.set_service("light.turn_on");
-      svc.init_data(1);
-      svc.add_data("entity_id", cfg_.entity_id);
-      //svc.add_data("brightness", "255");          // 255 = 100 %
-      //svc.add_data("rgb_color", "[255,255,255]");      
-    }
-    else
-    { // → Ausschalten
-      ESP_LOGD("Light", "Toggling lights OFF");
-      svc.set_service("light.turn_off");
-      svc.init_data(1);
-      svc.add_data("entity_id", cfg_.entity_id);
-    }
-    svc.play();
+    ESP_LOGD("Light", "Toggling lights %s", !on ? "ON" : "OFF");
+    tile_dashboard_ha::call_action(!on ? "light.turn_on" : "light.turn_off",
+                                    {{"entity_id", cfg_.entity_id}});
   }
 
   Cfg cfg_;

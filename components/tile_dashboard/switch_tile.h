@@ -9,7 +9,7 @@
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/api/api_server.h"
-#include "esphome/components/api/homeassistant_service.h"
+#include "ha_action.h"
 #include "switch_icon_renderer.h"
 
 using esphome::font::Font;
@@ -70,11 +70,7 @@ class SwitchTile : public Tile {
       cfg_.sw->publish_state(!on);
     ESP_LOGD("Switch", "Setting switch state to %s", on ? "OFF" : "ON");
     request_redraw();
-    api::HomeAssistantServiceCallAction<> call(api::global_api_server, false);
-    call.set_service(!on ? "switch.turn_on" : "switch.turn_off");
-    call.init_data(1);
-    call.add_data("entity_id", cfg_.entity_id);
-    call.play();
+    tile_dashboard_ha::call_action(!on ? "switch.turn_on" : "switch.turn_off", {{"entity_id", cfg_.entity_id}});
   }
 
   Cfg cfg_;
